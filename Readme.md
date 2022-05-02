@@ -55,7 +55,7 @@ When PowDroid finished processing the data, it will generate a CSV file in the `
 | start_time | end_time | Duration (mS) | Voltage (mV) | Remaining_charge (mAh) | Intensity (mA) | Power (W) | Consumed charge(mAh) | Energy (J) | Top app | Screen(ON/OFF) | GPS(ON/OFF) | Mobile_Radio(ON/OFF) | WiFi(ON/OFF) | Wifi radio | Camera(ON/OFF) | Video (ON/OFF) | Audio(ON/OFF) | Wakelock_in (Service) |
 |------------|----------|---------------|--------------|------------------------|----------------|-----------|----------------------|------------|---------|----------------|-------------|----------------------|--------------|------------|----------------|----------------|---------------|-----------------------|
 
-One basic statistics is to sum up the *Energy (J)* to get the total amount of energy consumed during your testing period. Of course, further statistics can be performed.
+One basic statistics is to sum up the *Energy (J)* to get the total amount of energy consumed during your testing period. Of course, further analysis can be performed.
 
 ## 🤝🏿 Contributors
 
