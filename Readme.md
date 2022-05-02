@@ -62,6 +62,8 @@ Contributors :
 - Alex Striedelmeyer
 - Johan Pelay
 
+PowDroid was first released on [our old git repository here](https://git.univ-pau.fr/powdroid/powdroid).
+
 ## 🔗 How to cite this work?
 
 F. Bouaffar, O. L. Goaer and A. Noureddine, "PowDroid: Energy Profiling of Android Applications," 2021 36th IEEE/ACM International Conference on Automated Software Engineering Workshops (ASEW), 2021, pp. 251-254, doi: 10.1109/ASEW52652.2021.00055.
