@@ -20,6 +20,7 @@ Install the following dependencies:
 
 - Disable the Battery Saver Mode
 - Set the brightness and sound level at 50%
+- Kill running apps and background services
 - A minimum 3-minute session (Battery level must decrease)
 
 ### Initial configuration
@@ -47,8 +48,14 @@ After the testing period is over, press *enter*. Wait for the next prompt to plu
 
 Data collection is in progress and can take several minutes. No user action is needed afterwards. Be sure to not disconnect the phone during the whole data collection process.
 
-When PowDroid finished processing the data, it will generate a CSV file in the ```output``` folder and prints the path to the file on the terminal.
+#### Machine-ready output
 
+When PowDroid finished processing the data, it will generate a CSV file in the ```output``` folder and prints the path to the file on the terminal. The available variables are the following:
+
+| start_time | end_time | Duration (mS) | Voltage (mV) | Remaining_charge (mAh) | Intensity (mA) | Power (W) | Consumed charge(mAh) | Energy (J) | Top app | Screen(ON/OFF) | GPS(ON/OFF) | Mobile_Radio(ON/OFF) | WiFi(ON/OFF) | Wifi radio | Camera(ON/OFF) | Video (ON/OFF) | Audio(ON/OFF) | Wakelock_in (Service) |
+|------------|----------|---------------|--------------|------------------------|----------------|-----------|----------------------|------------|---------|----------------|-------------|----------------------|--------------|------------|----------------|----------------|---------------|-----------------------|
+
+One basic statistics is to sum up the *Energy (J)* to get the total amount of energy consumed during your testing period. Of course, further statistics can be performed.
 
 ## 🤝🏿 Contributors
 
