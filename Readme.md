@@ -31,7 +31,7 @@ On your phone a prompt should appear asking for permission for debugging. If the
 
 ### Running and Using PowDroid
 
-Just run `python powdroid.py` in your terminal and follow the on-screen instructions.
+Just run `python3 powdroid.py` in your terminal and follow the on-screen instructions.
 
 #### Explanation of steps
 
