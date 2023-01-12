@@ -19,6 +19,7 @@ Install the following dependencies:
 ### Optimal test conditions
 
 - Disable the Battery Saver Mode
+- Disable screen timeout
 - Set the brightness and sound level at 50%
 - Kill running apps and background services
 - A minimum 3-minute session (Battery level must decrease)
