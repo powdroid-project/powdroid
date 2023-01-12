@@ -6,7 +6,7 @@ Powdroid is a command-line tool for measuring energy consumption of android apps
 
 Install the following dependencies:
 - Android SDK platform tools (https://developer.android.com/studio/releases/platform-tools)
-- Python 3+ runtime (https://www.python.org/downloads/)
+- Python 3.10 or below (https://www.python.org/downloads/)
 - Pandas module
 - GO runtime (https://go.dev/dl/)
 
