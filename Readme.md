@@ -10,7 +10,7 @@ Install the following dependencies:
 - Pandas module
 - GO runtime (https://go.dev/dl/)
 
-⚠️ Then you must add command `adb` to your environment PATH (python and go should already be in the path, if not add them like adb):
+⚠️ Then you must add command ```adb``` to your environment PATH (python and go should already be in the path, if not add them like adb):
 - On Windows, edit the PATH environment variable in Advanced System Settings, then System Properties, then Environment Variables, and finally choose Path and edit it by adding the new path (the location where you installed platform-tools).
 - On Unix-style systems: `export PATH=/the/path/to/target/:$PATH` to your .profile or .bashrc file.
 
@@ -64,7 +64,7 @@ The project is developed and maintained by:
 - Olivier Le Goaër
 - Adel Noureddine
 
-Contributors :
+Previous contributors :
 - Fares Bouaffar (initial author)
 - Pierre-Antoine Larguet
 - Alex Striedelmeyer
@@ -75,7 +75,6 @@ PowDroid was first released on [our old git repository here](https://git.univ-pa
 ## 🔗 How to cite this work?
 
 F. Bouaffar, O. L. Goaer and A. Noureddine, "[PowDroid: Energy Profiling of Android Applications](https://hal.archives-ouvertes.fr/hal-03380605v1/)", 2021 36th IEEE/ACM International Conference on Automated Software Engineering Workshops (ASEW), 2021, pp. 251-254, doi: 10.1109/ASEW52652.2021.00055.
-
 
 ## :newspaper: License
 

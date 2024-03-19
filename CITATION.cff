@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the research paper."
+preferred-citation:
+  type: conference-paper
+  conference:
+    name: "SUSTAINSE"
+  collection-title: "Proceedings of the Second International Workshop on Sustainable Software Engineering, Automated Software Engineering 2021"
+  publisher: IEEE
+  authors:
+  - family-names: "Bouaffar"
+    given-names: "Fares"
+  - family-names: "Le Goaer"
+    given-names: "Olivier"
+  - family-names: "Noureddine"
+    given-names: "Adel"
+    orcid: "https://orcid.org/0000-0002-8585-574X"
+  title: "PowDroid: Energy Profiling of Android Applications"
+  year: 2021
+  doi: 10.1109/ASEW52652.2021.00055
