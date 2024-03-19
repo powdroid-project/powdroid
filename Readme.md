@@ -1,5 +1,5 @@
 # PowDroid: A lightweight tool for measuring the energy footprint of any android application
-***
+
 Powdroid is a command-line tool for measuring energy consumption of android apps. Just test your app for several minutes and get a csv output file with different energy-related metrics.
 
 ## 🔧 Setup
