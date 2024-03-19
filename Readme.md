@@ -1,6 +1,7 @@
-# PowDroid: A lightweight tool for measuring the energy footprint of any android application
+# PowDroid: A lightweight tool for measuring the energy footprint of any Android application
 
-Powdroid is a command-line tool for measuring energy consumption of android apps. Just test your app for several minutes and get a csv output file with different energy-related metrics.
+Powdroid is a command-line tool for measuring energy consumption of android apps.
+Just test your application for several minutes and get a csv output file with different energy-related metrics.
 
 ## 🔧 Setup
 
@@ -32,7 +33,7 @@ On your phone a prompt should appear asking for permission for debugging. If the
 
 ### Running and Using PowDroid
 
-Just run `python3 powdroid.py` in your terminal and follow the on-screen instructions.
+Just run `python powdroid.py` in your terminal and follow the on-screen instructions.
 
 #### Explanation of steps
 
@@ -64,21 +65,30 @@ The project is developed and maintained by:
 - Olivier Le Goaër
 - Adel Noureddine
 
-Previous contributors :
-- Fares Bouaffar (initial author)
-- Pierre-Antoine Larguet
-- Alex Striedelmeyer
-- Johan Pelay
-
-PowDroid was first released on [our old git repository here](https://git.univ-pau.fr/powdroid/powdroid).
+Previous contributors : Fares Bouaffar (initial author), Pierre-Antoine Larguet, Alex Striedelmeyer, Johan Pelay.
+PowDroid was first released on [our old university git repository here](https://git.univ-pau.fr/powdroid/powdroid), and on [our old gitlab repository here](https://gitlab.com/powdroid/powdroid-cli).
 
 ## 🔗 How to cite this work?
 
-F. Bouaffar, O. L. Goaer and A. Noureddine, "[PowDroid: Energy Profiling of Android Applications](https://hal.archives-ouvertes.fr/hal-03380605v1/)", 2021 36th IEEE/ACM International Conference on Automated Software Engineering Workshops (ASEW), 2021, pp. 251-254, doi: 10.1109/ASEW52652.2021.00055.
+To cite PowDroid, please cite our paper in the 2nd International Workshop on Sustainable Software Engineering (SUSTAINSE) at ASE 2021 conference.
+
+- **(link: https://hal.archives-ouvertes.fr/hal-03380605v1 text: PowDroid: Energy Profiling of Android Applications)**. Fares Bouaffar, Olivier Le Goaer, and Adel Noureddine. In the Second International Workshop on Sustainable Software Engineering (SUSTAINSE)/(ASE'21), Melbourne, Australia, November 2021.
+
+```
+@inproceedings{bouaffar2021powdroid,
+  title = {PowDroid: Energy Profiling of Android Applications},
+  author = {Bouaffar, Fares and Le Goaer, Olivier and Noureddine, Adel},
+  booktitle = {2nd International Workshop on Sustainable Software Engineering (SUSTAINSE), at ASE 2021},
+  address = {Melbourne, Australia}
+  year = {2021}
+  month = {Nov},
+  keywords = {Energy consumption; Android; Battery drain; Estimation; Tool}
+}
+```
 
 ## :newspaper: License
 
 PowDroid is licensed under the GNU GPL 3 license only (GPL-3.0-only).
 
-Copyright (c) 2021-2022, Université de Pau et des Pays de l'Adour.
+Copyright (c) 2021-2024, Université de Pau et des Pays de l'Adour.
 All rights reserved. This program and the accompanying materials are made available under the terms of the GNU General Public License v3.0 only (GPL-3.0-only) which accompanies this distribution, and is available at: https://www.gnu.org/licenses/gpl-3.0.en.html
