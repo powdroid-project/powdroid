@@ -72,7 +72,7 @@ PowDroid was first released on [our old university git repository here](https://
 
 To cite PowDroid, please cite our paper in the 2nd International Workshop on Sustainable Software Engineering (SUSTAINSE) at ASE 2021 conference.
 
-- **(link: https://hal.archives-ouvertes.fr/hal-03380605v1 text: PowDroid: Energy Profiling of Android Applications)**. Fares Bouaffar, Olivier Le Goaer, and Adel Noureddine. In the Second International Workshop on Sustainable Software Engineering (SUSTAINSE)/(ASE'21), Melbourne, Australia, November 2021.
+- **[PowDroid: Energy Profiling of Android Applications](https://hal.archives-ouvertes.fr/hal-03380605v1)**. Fares Bouaffar, Olivier Le Goaer, and Adel Noureddine. In the Second International Workshop on Sustainable Software Engineering (SUSTAINSE)/(ASE'21), Melbourne, Australia, November 2021.
 
 ```
 @inproceedings{bouaffar2021powdroid,
