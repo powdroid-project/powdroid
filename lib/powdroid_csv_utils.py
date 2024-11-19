@@ -182,15 +182,15 @@ def process_csv_file(init_test_time, end_test_time):
         convert_A = intensity /1000
         
         #Power in milliWatt
-        power = float(convert_V * convert_A)
+        power = float((convert_V * convert_A).iloc[0])
         output_df.at[i, 'Power (W)'] = power
 
         #Consumed charge in mAh
-        consumed_charge = float(intensity * duration_hr)
+        consumed_charge = float((intensity * duration_hr).iloc[0])
         output_df.at[i, 'Consumed charge(mAh)'] = consumed_charge
 
         #Consumed energy in Joule
-        energy = float(power * duration_sec)
+        energy = float((power * duration_sec).iloc[0])
         output_df.at[i, 'Energy (J)'] = energy
 
     CSV_FULL_FILENAME = os.path.join(OUTPUT_DIR,'PowDroid_{0}.csv'.format(datetime.now().timestamp()))
