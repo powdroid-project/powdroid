@@ -41,19 +41,19 @@ def main():
     if len(output_formats) > 1:
         print(f"[PowDroid] INFO | Multiple output formats selected: {', '.join(output_formats)}")
     
-    # setup_path = os.path.join(os.path.dirname(__file__), 'setup.py')
-    # if os.path.exists(setup_path):
-    #     setup_command = [sys.executable, setup_path]
-    #     if args.verbose:
-    #         setup_command.append("--verbose")
-    #     try:
-    #         subprocess.run(setup_command, check=True)
-    #     except subprocess.CalledProcessError as e:
-    #         print(f"[Debug] ERROR | Setup script failed with error: {e}")
-    #         return
-    # else:
-    #     print("[Debug] ERROR | setup.py not found.")
-    #     return
+    setup_path = os.path.join(os.path.dirname(__file__), 'setup.py')
+    if os.path.exists(setup_path):
+        setup_command = [sys.executable, setup_path]
+        if args.verbose:
+            setup_command.append("--verbose")
+        try:
+            subprocess.run(setup_command, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"[Debug] ERROR | Setup script failed with error: {e}")
+            return
+    else:
+        print("[Debug] ERROR | setup.py not found.")
+        return
     
     if len(sys.argv) > 1:
         from cli.cli_interface import main as cli_main
