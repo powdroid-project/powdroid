@@ -23,7 +23,7 @@ Install the following dependencies:
 - Disable screen timeout
 - Set the brightness and sound level at 50%
 - Kill running apps and background services
-- A minimum 3-minute session (Battery level must decrease)
+- A minimum 5-minute session (Battery level must decrease)
 
 ### Initial configuration
 
