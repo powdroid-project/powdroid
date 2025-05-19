@@ -15,13 +15,20 @@ def check_android_sdk():
         raise SystemExit("[Debug] Exiting due to missing Android SDK platform tools.")
 
 def check_python_version():
-    if command_in_path("python"):
+    python_cmd = None
+    for cmd in ("python", "python3"):
+        if command_in_path(cmd):
+            python_cmd = cmd
+            break
+
+    if python_cmd:
         try:
-            result = subprocess.run(["python", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            print(f"[PowDroid] OK | Python is installed. Version: {result.stdout.strip() or result.stderr.strip()}")
+            result = subprocess.run([python_cmd, "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            version = result.stdout.strip() or result.stderr.strip()
+            print(f"[PowDroid] OK | {python_cmd.capitalize()} is installed. Version: {version}")
         except Exception as e:
-            print(f"[Debug] An error occurred while checking Python: {e}")
-            raise SystemExit("[Debug] Exiting due to Python check error.")
+            print(f"[Debug] An error occurred while checking {python_cmd}: {e}")
+            raise SystemExit(f"[Debug] Exiting due to {python_cmd} check error.")
     else:
         print("[Debug] Error | Python is not installed or not in the PATH.")
         print("[Debug] └── Please ensure that Python is installed and configured as described in the README.")
@@ -35,6 +42,15 @@ def check_pandas_module():
         print("[Debug] Error | The Pandas module is not installed. Run 'pip install pandas' to install it.")
         print("[Debug] └── Please ensure that all required Python modules are installed as described in the README.")
         raise SystemExit("[Debug] Exiting due to missing Pandas module.")
+
+def check_gui_modules():
+    try:
+        import matplotlib
+        import ttkbootstrap
+        print("[PowDroid] OK | GUI modules matplotlib and ttkbootstrap are installed.")
+    except ImportError:
+        print("[PowDroid] INFO | GUI modules (pandas, matplotlib, ttkbootstrap) are not fully installed.")
+        print("[PowDroid] └── If you wish to use the GUI, run: pip install pandas matplotlib ttkbootstrap")
 
 def check_go_runtime():
     if command_in_path("go"):
@@ -85,6 +101,8 @@ def main(verbose=False):
         check_pandas_module()
     except SystemExit as e:
         errors.append(str(e))
+
+    check_gui_modules()
 
     try:
         check_go_runtime()

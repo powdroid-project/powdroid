@@ -1,40 +1,17 @@
 import os
 import pandas
 import glob
-import shutil
 from datetime import datetime
 from pathlib import Path
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DUMP_DIR = Path(BASE_DIR) / "../dump"
-TMP_DIR = Path(BASE_DIR) / "../tmp"
+DUMP_DIR = Path(os.getcwd()) / "dump"
+TMP_DIR = Path(os.getcwd()) / "tmp"
 OUTPUT_DIR = Path(os.getcwd())
-
-def create_directory(path, verbose=False):
-    try:
-        os.makedirs(path, exist_ok=True)
-        if verbose:
-            print(f"[PowDroid] Directory created or already exists: {path}")
-    except Exception as e:
-        print(f"[Debug] Error in create_directory() at line {e.__traceback__.tb_lineno}: {e}")
-        raise
-
-def delete_directory(path, verbose=False):
-    try:
-        if os.path.exists(path):
-            shutil.rmtree(path)
-            if verbose:
-                print(f"[PowDroid] Directory deleted: {path}")
-        else:
-            if verbose:
-                print(f"[PowDroid] Directory does not exist: {path}")
-    except Exception as e:
-        print(f"[Debug] Error in delete_directory() at line {e.__traceback__.tb_lineno}: {e}")
-        raise
 
 def generate_files(file):
     try:
-        create_directory(TMP_DIR)
+        TMP_DIR.resolve()
+        TMP_DIR.mkdir(parents=True, exist_ok=True)
         df = pandas.read_csv(os.path.join(DUMP_DIR, file))
         Metrics = ["Voltage", "Screen", "GPS", "Camera", "Audio", "Mobile radio active", "Coulomb charge", "Top app", "Wifi on", "Wifi radio", "Video", "Wakelock_in"]
         for metric in Metrics:
@@ -57,11 +34,10 @@ def union_time():
 
     list_temp = list(ensembles_temps)
     list_temp.sort()
-    
     return list_temp
 
-def look_up(csv_file, start_time, end_time):
-    file_readed = pandas.read_csv(TMP_DIR / csv_file)
+def look_up(file_name, start_time, end_time):
+    file_readed = pandas.read_csv(TMP_DIR / file_name)
     found = file_readed[(start_time >= file_readed.start_time) & (end_time <= file_readed.end_time)]
     if(len(found)==0):
         metric_value = 0.0
@@ -69,25 +45,24 @@ def look_up(csv_file, start_time, end_time):
         metric_value = found["value"].values
     return metric_value
 
-def look_up_intensity(csv_file, start_time, end_time):
-    file_readed = pandas.read_csv(TMP_DIR / csv_file)
-    file_readed["next_value"] = file_readed["value"].shift(-1).dropna()
-    
+def look_up_intensity(file_name, start_time, end_time):
+    file_readed = pandas.read_csv(TMP_DIR / file_name)
+    file_readed["next_value"] = file_readed["value"].shift(-1)
     found = file_readed[(start_time >= file_readed.start_time) & (end_time <= file_readed.end_time)]
-    
+
     if len(found) == 0:
         amp = 0
     else:
         charge_consumed = found["value"] - found["next_value"]
         duration_sec = (file_readed.end_time - file_readed.start_time) / 1000
         duration_hr = duration_sec / 3600
+        duration_hr = duration_hr.replace(0, float('nan')) if hasattr(duration_hr, 'replace') else duration_hr
         amp_value = charge_consumed / duration_hr
         amp = amp_value.dropna()
-        
     return amp.values
 
-def look_up_bool(csv_file, start_time, end_time):
-    file_readed = pandas.read_csv(TMP_DIR / csv_file)
+def look_up_bool(file_name, start_time, end_time):
+    file_readed = pandas.read_csv(TMP_DIR / file_name)
     found = file_readed[(start_time >= file_readed.start_time) & (end_time <= file_readed.end_time)]
     if(len(found)==0):
         metric_value = False
@@ -95,115 +70,87 @@ def look_up_bool(csv_file, start_time, end_time):
         metric_value = True
     return metric_value
 
-def process_csv_file(init_test_time, end_test_time, verbose=False):
+def process_csv_file(init_test_time, end_test_time):
     try:
-        if verbose:
-            print(f"[PowDroid] Output directory set to: {OUTPUT_DIR}")
-        create_directory(TMP_DIR, verbose=verbose)
+        metrics = [
+            "Voltage.csv", "Screen.csv", "GPS.csv", "Camera.csv", "Audio.csv",
+            "Mobile radio active.csv", "Coulomb charge.csv", "Top app.csv",
+            "Wifi on.csv", "Wifi radio.csv", "Video.csv", "Wakelock_in.csv"
+        ]
+        columns = [
+            "start_time", "end_time", "Duration (mS)", "Voltage (mV)", "Remaining_charge (mAh)",
+            "Intensity (mA)", "Power (W)", "Consumed charge(mAh)", "Energy (J)", "Top app", "Screen(ON/OFF)",
+            "GPS(ON/OFF)", "Mobile_Radio(ON/OFF)", "WiFi(ON/OFF)", "Wifi radio", "Camera(ON/OFF)",
+            "Video (ON/OFF)", "Audio(ON/OFF)", "Wakelock_in (Service)"
+        ]
+        rows = []
 
-        all_csv_files = ["Voltage.csv","Screen.csv","GPS.csv","Camera.csv","Audio.csv","Mobile radio active.csv","Coulomb charge.csv","Top app.csv","Wifi on.csv","Wifi radio.csv", "Video.csv","Wakelock_in.csv"]
-        data_init_dataframe = [[0, 0, 0, 0, 0, 0, 0, 0, 0, "", 0, 0, 0, 0, 0, 0, 0, 0, ""]]
-        output_df = pandas.DataFrame(data_init_dataframe)
-        output_df.columns = ["start_time", "end_time", "Duration (mS)", "Voltage (mV)", "Remaining_charge (mAh)",
-                             "Intensity (mA)", "Power (W)", "Consumed charge(mAh)", "Energy (J)", "Top app", "Screen(ON/OFF)",
-                             "GPS(ON/OFF)", "Mobile_Radio(ON/OFF)", "WiFi(ON/OFF)",
-                             "Wifi radio", "Camera(ON/OFF)","Video (ON/OFF)",
-                             "Audio(ON/OFF)", "Wakelock_in (Service)"]
-        
-        time_intervals = list(filter(lambda t : t >= init_test_time and t <= end_test_time, union_time()))
-        
-        for i in range(len(time_intervals)-1):
-            start_time = time_intervals[i]
-            end_time = time_intervals[i+1]
-            
-            output_df.at[i,'start_time'] = start_time
-            output_df['start_time'] = output_df['start_time'].astype('Int64')
-            
-            output_df.at[i,'end_time'] = end_time
-            output_df['end_time'] = output_df['end_time'].astype('Int64')
+        time_intervals = [t for t in union_time() if init_test_time <= t <= end_test_time]
+        n_intervals = len(time_intervals) - 1
 
+        if n_intervals <= 0:
+            print("[DEBUG] Aucun intervalle trouvé, vérifie les timestamps !")
+            return None
+
+        def safe_first(val):
+            try:
+                if hasattr(val, '__len__') and not isinstance(val, str):
+                    return val[0] if len(val) > 0 else None
+                return val if val != 0.0 else None
+            except Exception:
+                return None
+
+        for i in range(n_intervals):
+            start_time, end_time = time_intervals[i], time_intervals[i + 1]
             duration = end_time - start_time
-            output_df.at[i, 'Duration (mS)'] = duration
-            output_df['Duration (mS)'] = output_df['Duration (mS)'].astype('Int64')
-            
+
             volt = look_up("Voltage.csv", start_time, end_time)
-            output_df.at[i,'Voltage (mV)'] = volt
-            output_df['Voltage (mV)'] = output_df['Voltage (mV)'].astype('Int64')
-
             coulomb = look_up("Coulomb charge.csv", start_time, end_time)
-            output_df.at[i,'Remaining_charge (mAh)'] = coulomb
-            output_df['Remaining_charge (mAh)'] = output_df['Remaining_charge (mAh)'].astype('Int64')
-
             amp = look_up_intensity("Coulomb charge.csv", start_time, end_time)
-            output_df['Intensity (mA)'] = output_df['Intensity (mA)'].astype('Float64')
-            output_df.at[i,'Intensity (mA)'] = amp
-
             app = look_up("Top app.csv", start_time, end_time)
-            output_df.at[i,'Top app'] = app
-
             wakelock_in = look_up("Wakelock_in.csv", start_time, end_time)
-            output_df.at[i,'Wakelock_in (Service)'] = wakelock_in
-            
-            screen = look_up_bool("Screen.csv", start_time, end_time)
-            output_df['Screen(ON/OFF)'] = output_df['Screen(ON/OFF)'].astype('bool')
-            output_df.at[i,'Screen(ON/OFF)'] = screen
-            
-            gps = look_up_bool("GPS.csv", start_time, end_time)
-            output_df['GPS(ON/OFF)'] = output_df['GPS(ON/OFF)'].astype('bool')
-            output_df.at[i,'GPS(ON/OFF)'] = gps
-            
-            cam = look_up_bool("Camera.csv", start_time, end_time)
-            output_df['Camera(ON/OFF)'] = output_df['Camera(ON/OFF)'].astype('bool')
-            output_df.at[i,'Camera(ON/OFF)'] = cam
-            
-            audio = look_up_bool("Audio.csv", start_time, end_time)
-            output_df['Audio(ON/OFF)'] = output_df['Audio(ON/OFF)'].astype('bool')
-            output_df.at[i,'Audio(ON/OFF)'] = audio
-            
-            mobile = look_up_bool("Mobile radio active.csv", start_time, end_time)
-            output_df['Mobile_Radio(ON/OFF)'] = output_df['Mobile_Radio(ON/OFF)'].astype('bool')
-            output_df.at[i,'Mobile_Radio(ON/OFF)'] = mobile
-            
-            wifi = look_up_bool("Wifi on.csv", start_time, end_time)
-            output_df['WiFi(ON/OFF)'] = output_df['WiFi(ON/OFF)'].astype('bool')
-            output_df.at[i,'WiFi(ON/OFF)'] = wifi
-            
-            wifi_r = look_up_bool("Wifi radio.csv", start_time, end_time)
-            output_df['Wifi radio'] = output_df['Wifi radio'].astype('bool')
-            output_df.at[i,'Wifi radio'] = wifi_r
-            
-            video = look_up_bool("Video.csv", start_time, end_time)
-            output_df['Video (ON/OFF)'] = output_df['Video (ON/OFF)'].astype('bool')
-            output_df.at[i,'Video (ON/OFF)'] = video
 
-        for i in range(len(time_intervals)-1):
-            start_time = time_intervals[i]
-            end_time = time_intervals[i+1]
-            found = output_df[(start_time >= output_df.start_time) & (end_time <= output_df.end_time)]
+            # Calculs directs pour les colonnes dérivées
+            voltage = safe_first(volt)
+            intensity = safe_first(amp)
+            duration_sec = duration / 1000 if duration else 0
+            duration_hr = duration_sec / 3600 if duration_sec else 0
+            convert_V = voltage / 1000 if voltage else 0
+            convert_A = intensity / 1000 if intensity else 0
 
-            duration_sec = found['Duration (mS)']/1000
-            duration_hr = duration_sec / 3600
-            intensity = found['Intensity (mA)']
-            voltage = found['Voltage (mV)']
-            convert_V = voltage /1000
-            convert_A = intensity /1000
-            
-            power = float((convert_V * convert_A).iloc[0])
-            output_df.at[i, 'Power (W)'] = power
+            power = convert_V * convert_A
+            consumed_charge = intensity * duration_hr if intensity else 0
+            energy = power * duration_sec
 
-            consumed_charge = float((intensity * duration_hr).iloc[0])
-            output_df.at[i, 'Consumed charge(mAh)'] = consumed_charge
+            row = {
+                "start_time": start_time,
+                "end_time": end_time,
+                "Duration (mS)": duration,
+                "Voltage (mV)": voltage,
+                "Remaining_charge (mAh)": safe_first(coulomb),
+                "Intensity (mA)": intensity,
+                "Power (W)": power,
+                "Consumed charge(mAh)": consumed_charge,
+                "Energy (J)": energy,
+                "Top app": safe_first(app),
+                "Screen(ON/OFF)": look_up_bool("Screen.csv", start_time, end_time),
+                "GPS(ON/OFF)": look_up_bool("GPS.csv", start_time, end_time),
+                "Mobile_Radio(ON/OFF)": look_up_bool("Mobile radio active.csv", start_time, end_time),
+                "WiFi(ON/OFF)": look_up_bool("Wifi on.csv", start_time, end_time),
+                "Wifi radio": look_up_bool("Wifi radio.csv", start_time, end_time),
+                "Camera(ON/OFF)": look_up_bool("Camera.csv", start_time, end_time),
+                "Video (ON/OFF)": look_up_bool("Video.csv", start_time, end_time),
+                "Audio(ON/OFF)": look_up_bool("Audio.csv", start_time, end_time),
+                "Wakelock_in (Service)": safe_first(wakelock_in)
+            }
+            rows.append(row)
 
-            energy = float((power * duration_sec).iloc[0])
-            output_df.at[i, 'Energy (J)'] = energy
+        output_df = pandas.DataFrame(rows, columns=columns)
 
-        CSV_FULL_FILENAME = os.path.join(OUTPUT_DIR,'PowDroid_{0}.csv'.format(datetime.now().timestamp()))
-        output_df.to_csv(CSV_FULL_FILENAME, float_format='%f', index=False)
+        csv_filename = os.path.join(OUTPUT_DIR, f'PowDroid_{datetime.now().timestamp()}.csv')
+        output_df.to_csv(csv_filename, float_format='%f', index=False)
 
-        print(f"[PowDroid] Finished! File generated: {CSV_FULL_FILENAME}")
-        return CSV_FULL_FILENAME
+        return csv_filename
     except Exception as e:
         print(f"[Debug] Error in process_csv_file() at line {e.__traceback__.tb_lineno}: {e}")
         raise
-    finally:
-        delete_directory(TMP_DIR, verbose=verbose)
