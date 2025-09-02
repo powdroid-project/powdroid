@@ -43,7 +43,7 @@ def reduce_data(timestamps, energy_data, percentage):
 def generate_html(timestamps, energy_data, rows):
     table_headers = rows[0].keys()
     table_rows = ''.join(
-        f"<tr>{''.join(f'<td>{str(cell).replace(chr(10), " ").replace(chr(13), " ")}</td>' for cell in row.values())}</tr>" for row in rows
+        f'''<tr>{''.join(f'<td>{str(cell).replace(chr(10), " ").replace(chr(13), " ")}</td>' for cell in row.values())}</tr>''' for row in rows
     )
     html_content = f"""
     <!DOCTYPE html>
