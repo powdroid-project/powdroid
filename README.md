@@ -7,7 +7,7 @@ Simply test your application for a few minutes to generate a machine-ready outpu
 
 Install the following dependencies:
 - Android SDK platform tools (https://developer.android.com/studio/releases/platform-tools)
-- Python 3.10 or below (https://www.python.org/downloads/)
+- Python 3.x (https://www.python.org/downloads/)
 - Pandas module
 - GO runtime (https://go.dev/dl/)
 
