@@ -1,2 +1,5 @@
 # Exclude Python cache files
 __pycache__/
+dump
+.vscode
+.DS_Store
