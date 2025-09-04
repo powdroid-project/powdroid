@@ -1,0 +1,77 @@
+{
+  "app": {
+    "name": "PowDroid",
+    "version": "1.0"
+  },
+  "common": {
+    "close": "Close",
+    "please_wait": "Please wait...",
+    "errors": "Error"
+  },
+  "homepage": {
+    "welcome": "Welcome to PowDroid",
+    "subtitle": "Android Battery Consumption Analyzer",
+    "device_status": "Device Status",
+    "device_connected": "Device Connected",
+    "device_disconnected": "No Device Connected",
+    "buttons": {
+      "start_session": "Record a new session",
+      "view_reports": "View Reports",
+      "settings": "Settings"
+    },
+    "instructions": {
+      "title": "Instructions",
+      "step1": "Connect your Android smartphone via USB",
+      "step2": "Enable USB debugging in developer options",
+      "step3": "Click 'New Session' to start recording",
+      "step4": "Follow the on-screen instructions"
+    }
+  },
+  "about": {
+    "title": "About PowDroid",
+    "version": "Version {version}",
+    "description": "PowDroid is a battery consumption analysis tool for Android devices.",
+    "features": {
+      "title": "Features",
+      "battery_analysis": "Detailed battery consumption analysis",
+      "csv_export": "CSV data export",
+      "html_reports": "Interactive HTML reports generation",
+      "real_time": "Real-time monitoring",
+      "detailed_stats": "Detailed statistics per application"
+    },
+    "credits": {
+      "title": "Credits",
+      "developed_by": "Developed by the PowDroid team",
+      "university": "University of Pau and Pays de l'Adour",
+      "license": "License: MIT"
+    },
+    "links": {
+      "github": "GitHub",
+      "documentation": "Documentation",
+      "support": "Support"
+    }
+  },
+  "session": {
+    "title": "Recording Session",
+    "status": {
+      "ready": "Ready to record",
+      "preparing": "Preparing recording...",
+      "recording": "Recording in progress...",
+      "completed": "Recording completed"
+    },
+    "duration_label": "Duration:",
+    "progress": "Progress",
+    "buttons": {
+      "start": "Start Recording",
+      "stop": "Stop Recording",
+      "home": "Home"
+    },
+    "messages": {
+      "disconnect_device": "Please disconnect your device",
+      "reconnect_device": "Please reconnect your device",
+      "device_reconnected": "Device reconnected",
+      "extracting_data": "Extracting battery data...",
+      "generating_reports": "Generating reports..."
+    }
+  }
+}

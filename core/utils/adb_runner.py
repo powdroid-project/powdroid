@@ -38,6 +38,39 @@ def get_connected_device(id_only=False):
         print(f"Error getting connected device: {e}")
         return None
 
+def is_device_connected():
+    """Vérifie si un device Android est connecté."""
+    return get_connected_device() is not None
+
+def is_adb_available():
+    """Vérifie si ADB est disponible sur le système."""
+    try:
+        subprocess.check_output(["adb", "version"], text=True)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+def get_device_info():
+    """Récupère les informations détaillées du device connecté."""
+    try:
+        if not is_device_connected():
+            return None
+            
+        props = subprocess.check_output(["adb", "shell", "getprop"], text=True)
+        info = {}
+        
+        for line in props.splitlines():
+            if "[ro.product.manufacturer]" in line:
+                info['manufacturer'] = line.split(": ", 1)[1].strip().strip("[]")
+            elif "[ro.product.model]" in line:
+                info['model'] = line.split(": ", 1)[1].strip().strip("[]")
+            elif "[ro.build.version.release]" in line:
+                info['android_version'] = line.split(": ", 1)[1].strip().strip("[]")
+                
+        return info if info else None
+    except subprocess.CalledProcessError:
+        return None
+
 def wait_for_device_connection(verbose):
     print("[PowDroid] Waiting for device connection...")
     while True:

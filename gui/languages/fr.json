@@ -1,0 +1,77 @@
+{
+  "app": {
+    "name": "PowDroid",
+    "version": "2.0"
+  },
+  "common": {
+    "close": "Fermer",
+    "please_wait": "Veuillez patienter...",
+    "errors": "Erreur"
+  },
+  "homepage": {
+    "welcome": "Bienvenue dans PowDroid",
+    "subtitle": "Analyseur de consommation de batterie Android",
+    "device_status": "État du périphérique",
+    "device_connected": "Périphérique connecté",
+    "device_disconnected": "Aucun périphérique connecté",
+    "buttons": {
+      "start_session": "Nouvelle session",
+      "view_reports": "Voir les rapports",
+      "settings": "Paramètres"
+    },
+    "instructions": {
+      "title": "Instructions",
+      "step1": "Connectez votre smartphone Android via USB",
+      "step2": "Activez le débogage USB dans les options développeur",
+      "step3": "Cliquez sur 'Nouvelle session' pour commencer l'enregistrement",
+      "step4": "Suivez les instructions à l'écran"
+    }
+  },
+  "about": {
+    "title": "À propos de PowDroid",
+    "version": "Version {version}",
+    "description": "PowDroid est un outil d'analyse de la consommation de batterie pour les appareils Android.",
+    "features": {
+      "title": "Fonctionnalités",
+      "battery_analysis": "Analyse détaillée de la consommation de batterie",
+      "csv_export": "Export des données en format CSV",
+      "html_reports": "Génération de rapports HTML interactifs",
+      "real_time": "Surveillance en temps réel",
+      "detailed_stats": "Statistiques détaillées par application"
+    },
+    "credits": {
+      "title": "Crédits",
+      "developed_by": "Développé par l'équipe PowDroid",
+      "university": "Université de Pau et des Pays de l'Adour",
+      "license": "Licence : MIT"
+    },
+    "links": {
+      "github": "GitHub",
+      "documentation": "Documentation",
+      "support": "Support"
+    }
+  },
+  "session": {
+    "title": "Session d'enregistrement",
+    "status": {
+      "ready": "Prêt à enregistrer",
+      "preparing": "Préparation de l'enregistrement...",
+      "recording": "Enregistrement en cours...",
+      "completed": "Enregistrement terminé"
+    },
+    "duration_label": "Durée:",
+    "progress": "Progression",
+    "buttons": {
+      "start": "Démarrer l'enregistrement",
+      "stop": "Arrêter l'enregistrement",
+      "home": "Accueil"
+    },
+    "messages": {
+      "disconnect_device": "Veuillez débrancher votre appareil",
+      "reconnect_device": "Veuillez rebrancher votre appareil",
+      "device_reconnected": "Appareil reconnecté",
+      "extracting_data": "Extraction des données de batterie...",
+      "generating_reports": "Génération des rapports..."
+    }
+  }
+}
