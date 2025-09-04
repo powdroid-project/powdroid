@@ -25,7 +25,12 @@ def check_python_version():
         try:
             result = subprocess.run([python_cmd, "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             version = result.stdout.strip() or result.stderr.strip()
-            print(f"[PowDroid] OK | {python_cmd.capitalize()} is installed. Version: {version}")
+            # Version need to be above 3.x
+            if version.startswith("Python 3."):
+                print(f"[PowDroid] OK | {python_cmd.capitalize()} is installed. Version: {version}")
+            else:
+                print(f"[Debug] Error | {python_cmd.capitalize()} version is not supported. Version: {version}")
+                raise SystemExit("[Debug] Exiting due to unsupported Python version.")
         except Exception as e:
             print(f"[Debug] An error occurred while checking {python_cmd}: {e}")
             raise SystemExit(f"[Debug] Exiting due to {python_cmd} check error.")

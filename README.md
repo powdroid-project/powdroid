@@ -7,7 +7,7 @@ Simply test your application for a few minutes to generate a machine-ready outpu
 
 Install the following dependencies:
 - Android SDK platform tools (https://developer.android.com/studio/releases/platform-tools)
-- Python 3.10 or below (https://www.python.org/downloads/)
+- Python 3.x (https://www.python.org/downloads/)
 - Pandas module
 - GO runtime (https://go.dev/dl/)
 
@@ -43,7 +43,7 @@ The project is developed and maintained by:
 - Olivier Le Goaër
 - Adel Noureddine
 
-Previous contributors : Fares Bouaffar (initial author), Pierre-Antoine Larguet, Alex Striedelmeyer, Julien Desprez.
+Previous contributors : Fares Bouaffar (initial author), Pierre-Antoine Larguet, Alex Striedelmeyer, Julien Desprez, Nathan Lorit.
 PowDroid was first released on [our old university git repository here](https://git.univ-pau.fr/powdroid/powdroid), and on [our old gitlab repository here](https://gitlab.com/powdroid/powdroid-cli).
 
 ## 🔗 How to cite this work?

@@ -9,7 +9,7 @@ from pathlib import Path
 DUMP_DIR = Path(os.getcwd()) / "dump"
 GO_DIR = Path(__file__).resolve().parent / "../libs/battery-historian"
 
-def get_connected_device():
+def get_connected_device(id_only=False):
     try:
         output = subprocess.check_output(["adb", "devices"], text=True)
         devices = [
@@ -17,7 +17,23 @@ def get_connected_device():
             for line in output.splitlines()[1:]
             if line.strip() and line.strip().endswith("device")
         ]
-        return devices[0] if devices else None
+        if not devices:
+            return None
+        device_id = devices[0]
+        # Récupère les infos du device
+        props = subprocess.check_output([
+            "adb", "shell", "getprop"
+        ], text=True)
+        manufacturer = None
+        model = None
+        for line in props.splitlines():
+            if "[ro.product.manufacturer]" in line:
+                manufacturer = line.split(": ", 1)[1].strip().strip("[]")
+            if "[ro.product.model]" in line:
+                model = line.split(": ", 1)[1].strip().strip("[]")
+        if id_only:
+            return device_id
+        return f"{device_id} -> {manufacturer} {model}" if manufacturer and model else device_id
     except subprocess.CalledProcessError as e:
         print(f"Error getting connected device: {e}")
         return None
@@ -69,7 +85,7 @@ def _spinner(stop_event):
     sys.stdout.flush()
 
 def dump_batterystats(verbose):
-    device = get_connected_device()
+    device = get_connected_device(id_only=True)
     dump_dir = DUMP_DIR.resolve()
     dump_dir.mkdir(parents=True, exist_ok=True)
     batterystats_path = dump_dir / "batterystats.txt"
