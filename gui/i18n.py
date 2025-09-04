@@ -16,12 +16,56 @@ class I18nManager:
         self.current_language = "en"  # Langue par défaut
         self.translations = {}
         self.languages_dir = os.path.join(os.path.dirname(__file__), "languages")
+        self.config_file = os.path.join(
+            os.path.dirname(__file__), "..", ".powdroid_config.json"
+        )
         self.available_languages = self._get_available_languages()
+
+        # Charger la langue sauvegardée ou utiliser la langue par défaut
+        saved_language = self._load_saved_language()
+        if saved_language and saved_language in self.available_languages:
+            self.current_language = saved_language
+
         self.load_language(self.current_language)
 
     def _get_available_languages(self) -> Dict[str, str]:
         """Retourne la liste des langues disponibles."""
         return {"fr": "Français", "en": "English"}
+
+    def _load_saved_language(self) -> str:
+        """Charge la langue sauvegardée depuis le fichier de configuration."""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                    return config.get("language", "en")
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"[I18n] Erreur lors du chargement de la configuration: {e}")
+        return "en"
+
+    def _save_language_preference(self, language_code: str) -> bool:
+        """Sauvegarde la préférence de langue dans le fichier de configuration."""
+        try:
+            config = {}
+
+            if os.path.exists(self.config_file):
+                try:
+                    with open(self.config_file, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                except (json.JSONDecodeError, IOError):
+                    config = {}
+
+            config["language"] = language_code
+
+            with open(self.config_file, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+
+            print(f"[I18n] Préférence de langue sauvegardée: {language_code}")
+            return True
+
+        except (IOError, OSError) as e:
+            print(f"[I18n] Erreur lors de la sauvegarde de la langue: {e}")
+            return False
 
     def load_language(self, language_code: str) -> bool:
         """
@@ -71,7 +115,6 @@ class I18nManager:
             for k in keys:
                 value = value[k]
 
-            # Remplacement des variables si nécessaire
             if kwargs and isinstance(value, str):
                 try:
                     value = value.format(**kwargs)
@@ -93,7 +136,7 @@ class I18nManager:
 
     def switch_language(self, language_code: str) -> bool:
         """
-        Change la langue active.
+        Change la langue active et sauvegarde la préférence.
 
         Args:
             language_code: Code de la nouvelle langue
@@ -101,10 +144,12 @@ class I18nManager:
         Returns:
             bool: True si le changement a réussi
         """
-        return self.load_language(language_code)
+        if self.load_language(language_code):
+            self._save_language_preference(language_code)
+            return True
+        return False
 
 
-# Instance globale du gestionnaire i18n
 _i18n_manager = I18nManager()
 
 

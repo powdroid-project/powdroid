@@ -51,6 +51,52 @@
       "support": "Support"
     }
   },
+  "setup": {
+    "title": "Configuration",
+    "configuration_check": "Vérification de la Configuration",
+    "language_selector": {
+      "label": "Langue",
+      "change_restart": "Le changement de langue sera appliqué après redémarrage"
+    },
+    "checks": {
+      "android_sdk": {
+        "title": "Android SDK",
+        "description": "Vérification des outils de développement Android"
+      },
+      "python": {
+        "title": "Python",
+        "description": "Vérification de l'installation Python"
+      },
+      "pandas": {
+        "title": "Pandas",
+        "description": "Vérification du module Pandas pour le traitement des données"
+      },
+      "gui_modules": {
+        "title": "Modules GUI",
+        "description": "Vérification des modules d'interface graphique"
+      },
+      "go_runtime": {
+        "title": "Go Runtime",
+        "description": "Vérification du runtime Go pour Battery Historian"
+      },
+      "adb_server": {
+        "title": "Serveur ADB",
+        "description": "Initialisation du serveur de débogage Android"
+      }
+    },
+    "status": {
+      "ready": "Prêt à vérifier la configuration",
+      "checking": "Vérification en cours...",
+      "complete_success": "Configuration complète ! Tous les composants sont prêts.",
+      "complete_errors": "Problèmes détectés. Consultez les éléments en rouge ci-dessus.",
+      "error_checking": "Erreur lors de la vérification de {component}"
+    },
+    "buttons": {
+      "check": "Vérifier la Configuration",
+      "recheck": "Vérifier à Nouveau",
+      "close": "Fermer"
+    }
+  },
   "session": {
     "title": "Session d'enregistrement",
     "status": {

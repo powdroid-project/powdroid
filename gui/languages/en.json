@@ -51,6 +51,52 @@
       "support": "Support"
     }
   },
+  "setup": {
+    "title": "Setup",
+    "configuration_check": "Configuration Check",
+    "language_selector": {
+      "label": "Language",
+      "change_restart": "Language change will be applied after restart"
+    },
+    "checks": {
+      "android_sdk": {
+        "title": "Android SDK",
+        "description": "Verification of Android development tools"
+      },
+      "python": {
+        "title": "Python",
+        "description": "Verification of Python installation"
+      },
+      "pandas": {
+        "title": "Pandas",
+        "description": "Verification of Pandas module for data processing"
+      },
+      "gui_modules": {
+        "title": "GUI Modules",
+        "description": "Verification of graphical interface modules"
+      },
+      "go_runtime": {
+        "title": "Go Runtime",
+        "description": "Verification of Go runtime for Battery Historian"
+      },
+      "adb_server": {
+        "title": "ADB Server",
+        "description": "Initialization of Android debugging server"
+      }
+    },
+    "status": {
+      "ready": "Ready to check configuration",
+      "checking": "Checking in progress...",
+      "complete_success": "Configuration complete! All components are ready.",
+      "complete_errors": "Problems detected. Check the red items above.",
+      "error_checking": "Error while checking {component}"
+    },
+    "buttons": {
+      "check": "Check Configuration",
+      "recheck": "Check Again",
+      "close": "Close"
+    }
+  },
   "session": {
     "title": "Recording Session",
     "status": {

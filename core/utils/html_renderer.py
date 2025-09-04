@@ -2,26 +2,28 @@ import csv
 import os
 from datetime import datetime, timezone, timedelta
 
+
 def parse_csv(filepath):
     energy_data = []
     timestamps = []
     rows = []
-    with open(filepath, 'r') as file:
+    with open(filepath, "r") as file:
         reader = csv.DictReader(file)
         for row in reader:
             rows.append(row)
             try:
-                timestamp = int(row['start_time']) / 1000
+                timestamp = int(row["start_time"]) / 1000
                 dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
                 tz_offset = timedelta(hours=2)
                 local_dt = dt + tz_offset
                 tz_diff = f"GMT{'+' if tz_offset.total_seconds() >= 0 else '-'}{abs(tz_offset.total_seconds()) // 3600:.0f}"
-                timestamps.append(local_dt.strftime(f'%Y-%m-%d %H:%M:%S ({tz_diff})'))
-                energy_value = float(row['Energy (J)'])
+                timestamps.append(local_dt.strftime(f"%Y-%m-%d %H:%M:%S ({tz_diff})"))
+                energy_value = float(row["Energy (J)"])
                 energy_data.append(energy_value)
             except (ValueError, KeyError):
                 continue
     return timestamps, energy_data, rows
+
 
 def reduce_data(timestamps, energy_data, percentage):
     num_points = max(1, int(len(timestamps) * (percentage / 100)))
@@ -40,10 +42,12 @@ def reduce_data(timestamps, energy_data, percentage):
             reduced_energy.append(0)
     return reduced_timestamps, reduced_energy
 
+
 def generate_html(timestamps, energy_data, rows):
     table_headers = rows[0].keys()
-    table_rows = ''.join(
-        f'''<tr>{''.join(f'<td>{str(cell).replace(chr(10), " ").replace(chr(13), " ")}</td>' for cell in row.values())}</tr>''' for row in rows
+    table_rows = "".join(
+        f"""<tr>{''.join(f'<td>{str(cell).replace(chr(10), " ").replace(chr(13), " ")}</td>' for cell in row.values())}</tr>"""
+        for row in rows
     )
     html_content = f"""
     <!DOCTYPE html>
@@ -262,6 +266,7 @@ def generate_html(timestamps, energy_data, rows):
     </html>
     """
     return html_content
+
 
 def process_html_file(file_path):
     if not os.path.exists(file_path):
