@@ -1,15 +1,15 @@
 # PowDroid: A lightweight tool for measuring the energy footprint of any Android application
 
-Powdroid is a command-line tool that profiles the energy consumption of Android apps.
+Powdroid is a tool that profiles the energy consumption of Android apps.
 Simply test your application for a few minutes to generate a machine-ready output file containing various energy-related metrics.
 
 ## 🔧 Setup
 
 Install the following dependencies:
-- Android SDK platform tools (https://developer.android.com/studio/releases/platform-tools)
-- Python 3.x (https://www.python.org/downloads/)
-- Pandas module
-- GO runtime (https://go.dev/dl/)
+- [Android SDK platform tools](https://developer.android.com/studio/releases/platform-tools)
+- [Python 3.x](https://www.python.org/downloads/)
+- [Pandas module](https://pypi.org/project/pandas/)
+- [GO runtime](https://go.dev/dl/)
 
 ⚠️ Then you must add command ```adb``` to your environment PATH (python and go should already be in the path, if not add them like adb):
 - On Windows, edit the PATH environment variable in Advanced System Settings, then System Properties, then Environment Variables, and finally choose Path and edit it by adding the new path (the location where you installed platform-tools).
