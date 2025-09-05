@@ -98,18 +98,18 @@
     }
   },
   "session": {
-    "title": "Session d'enregistrement",
+    "title": "Surveillance de la Consommation de Batterie",
     "status": {
-      "ready": "Prêt à enregistrer",
-      "preparing": "Préparation de l'enregistrement...",
-      "recording": "Enregistrement en cours...",
-      "completed": "Enregistrement terminé"
+      "ready": "Prêt à surveiller",
+      "preparing": "Préparation de la surveillance...",
+      "recording": "Surveillance en cours...",
+      "completed": "Surveillance terminée"
     },
     "duration_label": "Durée:",
     "progress": "Progression",
     "buttons": {
-      "start": "Démarrer l'enregistrement",
-      "stop": "Arrêter l'enregistrement",
+      "start": "Démarrer",
+      "stop": "Terminer",
       "home": "Accueil"
     },
     "messages": {

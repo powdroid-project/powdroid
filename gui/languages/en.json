@@ -98,18 +98,18 @@
     }
   },
   "session": {
-    "title": "Recording Session",
+    "title": "Monitoring Battery Consumption",
     "status": {
-      "ready": "Ready to record",
-      "preparing": "Preparing recording...",
-      "recording": "Recording in progress...",
-      "completed": "Recording completed"
+      "ready": "Ready to monitor",
+      "preparing": "Preparing monitoring...",
+      "recording": "Monitoring in progress...",
+      "completed": "Monitoring completed"
     },
     "duration_label": "Duration:",
     "progress": "Progress",
     "buttons": {
-      "start": "Start Recording",
-      "stop": "Stop Recording",
+      "start": "Start",
+      "stop": "Stop",
       "home": "Home"
     },
     "messages": {

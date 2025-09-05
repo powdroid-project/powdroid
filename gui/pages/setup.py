@@ -153,7 +153,7 @@ def show_setup_window(parent, ico_dir):
         "margin: 10px 15px; padding: 10px; }"
     )
 
-    lang_label = QLabel(f"🌐 {t('setup.language_selector.label')}:")
+    lang_label = QLabel(f"{t('setup.language_selector.label')}:")
     lang_label.setFont(QFont("Arial", 12, QFont.Bold))
     lang_label.setStyleSheet("color: #ffffff; margin-right: 10px;")
     lang_layout.addWidget(lang_label)
@@ -167,31 +167,34 @@ def show_setup_window(parent, ico_dir):
         if code == current_lang:
             lang_combo.setCurrentText(name)
 
+    # Construire le chemin correct pour l'image de la flèche
+    down_arrow_path = str(ico_dir / "down_arrow.png").replace("\\", "/")
+
     lang_combo.setStyleSheet(
-        """
-        QComboBox {
+        f"""
+        QComboBox {{
             background-color: #3a3a3a; color: #ffffff; border: 1px solid #555555;
             border-radius: 5px; padding: 5px 10px; font-size: 12px; min-width: 120px;
-        }
-        QComboBox::drop-down {
+        }}
+        QComboBox::drop-down {{
             subcontrol-origin: padding; subcontrol-position: top right; width: 20px;
             border-left-width: 1px; border-left-color: #555555; border-left-style: solid;
-            border-top-right-radius: 5px; border-bottom-right-radius: 5px;
+            border-top-right-radius: 1px; border-bottom-right-radius: 5px;
             background-color: #4a4a4a;
-        }
-        QComboBox::down-arrow { width: 10px; height: 10px; background: #ffffff; }
-        QComboBox QAbstractItemView {
+        }}
+        QComboBox::down-arrow {{ image: url({down_arrow_path}); width: 12px; height: 12px; }}
+        QComboBox QAbstractItemView {{
             background-color: #3a3a3a; color: #ffffff;
             selection-background-color: #555555; border: 1px solid #555555;
-        }
-    """
+        }}
+        """
     )
 
     def handle_language_change():
         selected_code = lang_combo.currentData()
         if selected_code and selected_code != current_lang:
             switch_language(selected_code)
-            info_msg = QLabel(f"ℹ️ {t('setup.language_selector.change_restart')}")
+            info_msg = QLabel(f"i {t('setup.language_selector.change_restart')}")
             info_msg.setFont(QFont("Arial", 10))
             info_msg.setStyleSheet("color: #64b5f6; margin-left: 10px;")
 
@@ -202,7 +205,7 @@ def show_setup_window(parent, ico_dir):
                     item
                     and item.widget()
                     and isinstance(item.widget(), QLabel)
-                    and "ℹ️" in item.widget().text()
+                    and "i" in item.widget().text()
                 ):
                     item.widget().deleteLater()
 
