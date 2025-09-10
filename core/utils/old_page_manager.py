@@ -9,14 +9,16 @@ from pathlib import Path
 from datetime import datetime
 from tkinter import PhotoImage
 
+
 def add_footer(parent):
     copyright_label = ttk.Label(
         parent,
         text="© 2022-2025 PowDroid. All rights reserved.",
         font=("Segoe UI", 8),
-        foreground="#888888"
+        foreground="#888888",
     )
     copyright_label.pack(side="bottom", pady=(0, 5))
+
 
 def create_pages(app):
     pages = {}
@@ -30,35 +32,92 @@ def create_pages(app):
     except Exception:
         pass
 
+    # PowDroid banner
     try:
         banner_path = ICO_DIR / "powdroid_banner.png"
         if banner_path.exists():
             banner_img = PhotoImage(file=str(banner_path))
-            banner_label = ttk.Label(home_page, image=banner_img)
+            banner_label = ttk.Label(home_page, image=banner_img, background="#f8f9fa")
             banner_label.image = banner_img
-            banner_label.pack(pady=(10, 10))
-            ttk.Frame(home_page, height=20).pack()
+            banner_label.pack(pady=(30, 10))
         else:
             banner_path_ico = ICO_DIR / "powdroid_banner.ico"
             if banner_path_ico.exists():
                 banner_img = PhotoImage(file=str(banner_path_ico))
-                banner_label = ttk.Label(home_page, image=banner_img)
+                banner_label = ttk.Label(
+                    home_page, image=banner_img, background="#f8f9fa"
+                )
                 banner_label.image = banner_img
-                banner_label.pack(pady=(10, 10))
-                ttk.Frame(home_page, height=20).pack()
+                banner_label.pack(pady=(30, 10))
     except Exception:
         pass
 
+    # Slogan
     ttk.Label(
         home_page,
-        text="PowDroid: A lightweight tool for measuring the energy footprint of any Android application",
-        font=("Segoe UI", 10),
+        text="A lightweight tool to measure the energy footprint of any Android application",
+        font=("Segoe UI", 12, "bold"),
         padding=10,
-        anchor="w",
-        justify="left",
-        background=app.style.colors.secondary,
-        foreground="white"
-    ).pack(pady=(0, 20))
+        anchor="center",
+        justify="center",
+        foreground="#222222",
+        background="#f8f9fa",
+    ).pack(pady=(0, 30))
+
+    # ADB detection status
+    status_frame = ttk.Frame(home_page, style="TFrame")
+    status_frame.pack(pady=(0, 20))
+    status_label = ttk.Label(
+        status_frame,
+        text="ADB status: Checking...",
+        font=("Segoe UI", 10),
+        foreground="#555555",
+        background="#f8f9fa",
+    )
+    status_label.pack()
+
+    def update_adb_status():
+        from . import adb_runner as adb
+
+        device = adb.get_connected_device()
+        if device:
+            status_label.config(text=f"Phone detected: {device}", foreground="#28a745")
+        else:
+            status_label.config(text="No phone detected (ADB)", foreground="#dc3545")
+        # Refresh every 2 seconds
+        status_label.after(2000, update_adb_status)
+
+    update_adb_status()
+
+    # Button to start a recording session
+    def go_to_session():
+        # Switch to Session tab if Notebook detected
+        parent = home_page.master
+        try:
+            # Find Notebook parent
+            while parent and not hasattr(parent, "select"):
+                parent = parent.master
+            if parent:
+                # Tab 0 = Home, 1 = Session
+                parent.select(1)
+        except Exception:
+            pass
+
+    rec_img_path = ICO_DIR / "rec-button.png"
+    rec_img = PhotoImage(file=str(rec_img_path)) if rec_img_path.exists() else None
+    rec_button = ttk.Button(
+        home_page,
+        text="Start a recording session",
+        image=rec_img,
+        compound="left" if rec_img else None,
+        takefocus=0,
+        bootstyle="success",
+        command=go_to_session,
+    )
+    if rec_img:
+        rec_button.image = rec_img
+    rec_button.pack(pady=(0, 30))
+
     add_footer(home_page)
     pages["home"] = home_page
 
@@ -69,7 +128,7 @@ def create_pages(app):
         data_session_page,
         text="Data Session Page",
         font=("Segoe UI", 12, "bold"),
-        padding=10
+        padding=10,
     ).pack(pady=20)
 
     def refresh_data_session():
@@ -85,32 +144,39 @@ def create_pages(app):
         process_data_btn.config(state="normal")
         generate_btn.config(state="normal")
         session.clear()
-        session.update({"start": None, "stop": None, "device": None, "file_name": None, "csv_path": None})
+        session.update(
+            {
+                "start": None,
+                "stop": None,
+                "device": None,
+                "file_name": None,
+                "csv_path": None,
+            }
+        )
 
         detect_btn.config(state="normal")
 
     refresh_btn = ttk.Button(
-        data_session_page,
-        text="Refresh",
-        takefocus=0,
-        command=refresh_data_session
+        data_session_page, text="Refresh", takefocus=0, command=refresh_data_session
     )
     refresh_btn.pack(pady=5)
 
-    session = {"start": None, "stop": None, "device": None, "file_name": None, "csv_path": None}
+    session = {
+        "start": None,
+        "stop": None,
+        "device": None,
+        "file_name": None,
+        "csv_path": None,
+    }
 
     # --- STEP 1: Initialize connection ---
     step1_frame = ttk.LabelFrame(
-        data_session_page,
-        text="Step 1/4: Initialize device connection",
-        padding=15
+        data_session_page, text="Step 1/4: Initialize device connection", padding=15
     )
     step1_frame.pack(fill="x", pady=10, padx=10)
 
     detect_label = ttk.Label(
-        step1_frame,
-        text="Click 'Detect device' to start.",
-        font=("Segoe UI", 10)
+        step1_frame, text="Click 'Detect device' to start.", font=("Segoe UI", 10)
     )
     detect_label.pack(anchor="w", pady=(0, 10))
 
@@ -119,11 +185,17 @@ def create_pages(app):
         app.update_idletasks()
         device = adb.get_connected_device()
         if not device:
-            detect_label.config(text="No device detected. Please connect your device via USB.", foreground="red")
+            detect_label.config(
+                text="No device detected. Please connect your device via USB.",
+                foreground="red",
+            )
             adb.wait_for_device_connection(verbose=True)
             device = adb.get_connected_device()
             if not device:
-                detect_label.config(text="Device still not detected. Please try again.", foreground="red")
+                detect_label.config(
+                    text="Device still not detected. Please try again.",
+                    foreground="red",
+                )
                 return
         session["device"] = device
         detect_label.config(text=f"Device detected: {device}", foreground="green")
@@ -133,18 +205,13 @@ def create_pages(app):
         detect_btn.config(state="disabled")
 
     detect_btn = ttk.Button(
-        step1_frame,
-        text="Detect device",
-        takefocus=0,
-        command=on_detect
+        step1_frame, text="Detect device", takefocus=0, command=on_detect
     )
     detect_btn.pack(anchor="e")
 
     # --- STEP 2: Start recording (initially hidden) ---
     step2_frame = ttk.LabelFrame(
-        data_session_page,
-        text="Step 2/4: Start session recording",
-        padding=15
+        data_session_page, text="Step 2/4: Start session recording", padding=15
     )
 
     ttk.Label(
@@ -152,33 +219,28 @@ def create_pages(app):
         text="Disconnect the device, then click 'Start recording'.",
         font=("Segoe UI", 10),
         anchor="w",
-        justify="left"
+        justify="left",
     ).pack(anchor="w", pady=(0, 10))
 
-    record_label = ttk.Label(
-        step2_frame,
-        text="",
-        font=("Segoe UI", 10)
-    )
+    record_label = ttk.Label(step2_frame, text="", font=("Segoe UI", 10))
     record_label.pack(anchor="w", pady=(0, 10))
 
     def on_start_record():
-        record_label.config(text="Waiting for device disconnection...", foreground="orange")
+        record_label.config(
+            text="Waiting for device disconnection...", foreground="orange"
+        )
         app.update_idletasks()
         adb.wait_for_device_disconnection(verbose=True)
         session["start"] = datetime.now()
         record_label.config(
             text=f"Recording started at {session['start'].strftime('%Y-%m-%d %H:%M:%S')}. Please perform your test.",
-            foreground="green"
+            foreground="green",
         )
         start_record_btn.config(state="disabled")
         finish_record_btn.config(state="normal")
 
     start_record_btn = ttk.Button(
-        step2_frame,
-        text="Start recording",
-        takefocus=0,
-        command=on_start_record
+        step2_frame, text="Start recording", takefocus=0, command=on_start_record
     )
     start_record_btn.pack(anchor="e")
 
@@ -186,7 +248,7 @@ def create_pages(app):
         session["stop"] = datetime.now()
         record_label.config(
             text=f"Recording finished at {session['stop'].strftime('%Y-%m-%d %H:%M:%S')}",
-            foreground="blue"
+            foreground="blue",
         )
         finish_record_btn.config(state="disabled")
         step3_frame.pack(fill="x", pady=10, padx=10)
@@ -196,94 +258,89 @@ def create_pages(app):
         text="Finish recording",
         takefocus=0,
         command=on_finish_record,
-        state="disabled"
+        state="disabled",
     )
     finish_record_btn.pack(anchor="e")
 
     # --- STEP 3: Process battery data (initially hidden) ---
     step3_frame = ttk.LabelFrame(
-        data_session_page,
-        text="Step 3/4: Process battery data",
-        padding=15
+        data_session_page, text="Step 3/4: Process battery data", padding=15
     )
     ttk.Label(
         step3_frame,
         text="Reconnect the device, then click 'Process data'.",
         font=("Segoe UI", 10),
         anchor="w",
-        justify="left"
+        justify="left",
     ).pack(anchor="w", pady=(0, 10))
 
-    process_label = ttk.Label(
-        step3_frame,
-        text="",
-        font=("Segoe UI", 10)
-    )
+    process_label = ttk.Label(step3_frame, text="", font=("Segoe UI", 10))
     process_label.pack(anchor="w", pady=(0, 10))
 
     def on_process_data():
-        process_label.config(text="Waiting for device connection...", foreground="orange")
+        process_label.config(
+            text="Waiting for device connection...", foreground="orange"
+        )
         app.update_idletasks()
         adb.wait_for_device_connection(verbose=True)
         process_label.config(text="Processing battery data...", foreground="green")
         adb.dump_batterystats(verbose=True)
         file_name = adb.conversion_batterystats()
         session["file_name"] = file_name
-        process_label.config(text=f"Battery data processed: {file_name}", foreground="green")
+        process_label.config(
+            text=f"Battery data processed: {file_name}", foreground="green"
+        )
         step4_frame.pack(fill="x", pady=10, padx=10)
         process_data_btn.config(state="disabled")
 
     process_data_btn = ttk.Button(
-        step3_frame,
-        text="Process data",
-        takefocus=0,
-        command=on_process_data
+        step3_frame, text="Process data", takefocus=0, command=on_process_data
     )
     process_data_btn.pack(anchor="e")
 
     # --- STEP 4: Generate output files (initially hidden) ---
     step4_frame = ttk.LabelFrame(
-        data_session_page,
-        text="Step 4/4: Generate output files",
-        padding=15
+        data_session_page, text="Step 4/4: Generate output files", padding=15
     )
     ttk.Label(
         step4_frame,
         text="Select output formats and click 'Generate files' to get the results.",
         font=("Segoe UI", 10),
         anchor="w",
-        justify="left"
+        justify="left",
     ).pack(anchor="w", pady=(0, 10))
 
     output_csv_var = BooleanVar(value=True)
     output_html_var = BooleanVar(value=True)
     output_graphic_var = BooleanVar(value=False)
 
-    check_csv = ttk.Checkbutton(
-        step4_frame, text="CSV", variable=output_csv_var
-    )
-    check_html = ttk.Checkbutton(
-        step4_frame, text="HTML", variable=output_html_var
-    )
+    check_csv = ttk.Checkbutton(step4_frame, text="CSV", variable=output_csv_var)
+    check_html = ttk.Checkbutton(step4_frame, text="HTML", variable=output_html_var)
     check_graphic = ttk.Checkbutton(
-        step4_frame, text="Built-in graphic (coming soon)", variable=output_graphic_var, state="disabled"
+        step4_frame,
+        text="Built-in graphic (coming soon)",
+        variable=output_graphic_var,
+        state="disabled",
     )
     check_csv.pack(anchor="w")
     check_html.pack(anchor="w")
     check_graphic.pack(anchor="w")
 
-    output_label = ttk.Label(
-        step4_frame,
-        text="",
-        font=("Segoe UI", 10)
-    )
+    output_label = ttk.Label(step4_frame, text="", font=("Segoe UI", 10))
     output_label.pack(anchor="w", pady=(0, 10))
 
     def on_generate():
         output_label.config(text="Generating output files...", foreground="orange")
         app.update_idletasks()
-        if not session.get("file_name") or not session.get("start") or not session.get("stop"):
-            output_label.config(text="Missing session data. Please complete previous steps.", foreground="red")
+        if (
+            not session.get("file_name")
+            or not session.get("start")
+            or not session.get("stop")
+        ):
+            output_label.config(
+                text="Missing session data. Please complete previous steps.",
+                foreground="red",
+            )
             return
 
         # Respecte la logique CLI : on génère toujours le CSV si CSV ou HTML est coché
@@ -294,7 +351,9 @@ def create_pages(app):
             output_formats.append("html")
 
         if not output_formats:
-            output_label.config(text="Please select at least one output format.", foreground="red")
+            output_label.config(
+                text="Please select at least one output format.", foreground="red"
+            )
             return
 
         def to_timestamp_ms(dt):
@@ -322,19 +381,17 @@ def create_pages(app):
             generated.append(f"HTML: {html_path}")
 
         if not generated:
-            output_label.config(text="Please select at least one output format.", foreground="red")
+            output_label.config(
+                text="Please select at least one output format.", foreground="red"
+            )
         else:
             output_label.config(
-                text="Files generated:\n" + "\n".join(generated),
-                foreground="green"
+                text="Files generated:\n" + "\n".join(generated), foreground="green"
             )
             generate_btn.config(state="disabled")
 
     generate_btn = ttk.Button(
-        step4_frame,
-        text="Generate files",
-        takefocus=0,
-        command=on_generate
+        step4_frame, text="Generate files", takefocus=0, command=on_generate
     )
     generate_btn.pack(anchor="e")
 
@@ -351,7 +408,7 @@ def create_pages(app):
         content_frame,
         text="Upload Data Page",
         font=("Segoe UI", 12, "bold"),
-        padding=10
+        padding=10,
     ).pack(pady=20)
 
     ttk.Label(
@@ -362,19 +419,18 @@ def create_pages(app):
         anchor="w",
         justify="left",
         background=app.style.colors.secondary,
-        foreground="white"
+        foreground="white",
     ).pack(pady=(0, 20))
 
     def upload_csv():
         file_path = filedialog.askopenfilename(
-            filetypes=[("CSV files", "*.csv")],
-            title="Select a CSV file"
+            filetypes=[("CSV files", "*.csv")], title="Select a CSV file"
         )
         if not file_path:
             return
 
         try:
-            with open(file_path, newline='', encoding='utf-8') as csvfile:
+            with open(file_path, newline="", encoding="utf-8") as csvfile:
                 reader = pycsv.reader(csvfile)
                 rows = list(reader)
         except Exception as e:
@@ -391,10 +447,7 @@ def create_pages(app):
             table_frame.pack(pady=10, fill="both", expand=True)
 
             tree = ttk.Treeview(
-                table_frame,
-                columns=columns,
-                show="headings",
-                height=10
+                table_frame, columns=columns, show="headings", height=10
             )
             for col in columns:
                 tree.heading(col, text=col)
@@ -414,10 +467,7 @@ def create_pages(app):
             table_frame.grid_columnconfigure(0, weight=1)
 
     upload_btn = ttk.Button(
-        content_frame,
-        text="Upload CSV",
-        takefocus=0,
-        command=upload_csv
+        content_frame, text="Upload CSV", takefocus=0, command=upload_csv
     )
     upload_btn.pack(pady=10)
 
@@ -427,10 +477,7 @@ def create_pages(app):
                 widget.destroy()
 
     refresh_btn = ttk.Button(
-        content_frame,
-        text="Refresh",
-        takefocus=0,
-        command=refresh_table
+        content_frame, text="Refresh", takefocus=0, command=refresh_table
     )
     refresh_btn.pack(pady=5)
     add_footer(upload_data_page)
@@ -440,10 +487,7 @@ def create_pages(app):
     about_us_page = ttk.Frame(app, style="TFrame")
 
     ttk.Label(
-        about_us_page,
-        text="About PowDroid",
-        font=("Segoe UI", 14, "bold"),
-        padding=10
+        about_us_page, text="About PowDroid", font=("Segoe UI", 14, "bold"), padding=10
     ).pack(pady=20)
 
     ttk.Label(
@@ -457,12 +501,13 @@ def create_pages(app):
         font=("Segoe UI", 10),
         anchor="w",
         justify="left",
-        wraplength=500
+        wraplength=500,
     ).pack(pady=(0, 20), padx=10, anchor="w")
     add_footer(about_us_page)
     pages["about_us"] = about_us_page
 
     return pages
+
 
 def show_page(pages, page_name):
     for name, frame in pages.items():
