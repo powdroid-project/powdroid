@@ -132,14 +132,14 @@ class AboutDialog(QDialog):
             )
         )
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle_label = QLabel("Android Energy Profiler")
-        subtitle_font = QFont(self.font_family, 24, QFont.Weight.Normal)
-        subtitle_label.setFont(subtitle_font)
-        subtitle_label.setStyleSheet("color: #57C18B;")
-        subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # subtitle_label = QLabel("Android Energy Profiler")
+        # subtitle_font = QFont(self.font_family, 24, QFont.Weight.Normal)
+        # subtitle_label.setFont(subtitle_font)
+        # subtitle_label.setStyleSheet("color: #57C18B;")
+        # subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         logo_layout = QVBoxLayout()
         logo_layout.addWidget(logo_label)
-        logo_layout.addWidget(subtitle_label)
+        # logo_layout.addWidget(subtitle_label)
         logo_layout.setContentsMargins(0, 0, 0, 0)
 
         # Label with the version of PowDroid aligned to the right
@@ -147,7 +147,7 @@ class AboutDialog(QDialog):
         version_font = QFont(self.font_family, 20, QFont.Weight.Medium)
         version_label.setFont(version_font)
         version_label.setStyleSheet("color: #000000;")
-        version_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         version_label.setContentsMargins(0, 0, 0, 0)
 
         # Label for the description of PowDroid application
@@ -195,7 +195,7 @@ class AboutDialog(QDialog):
         content_layout.addLayout(logo_layout)
         content_layout.addWidget(
             version_label,
-            alignment=Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight,
+            alignment=Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter,
         )
         content_layout.addWidget(
             description_label, alignment=Qt.AlignmentFlag.AlignCenter
