@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QSize, QRect, QUrl
 from PyQt6.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QFontDatabase
 from typing import Optional
-from gui.i18n import t 
+from gui.i18n import t
 import os
 
 
@@ -178,9 +178,7 @@ class AboutDialog(QDialog):
         version_label.setContentsMargins(0, 0, 0, 0)
 
         # Label for the description of PowDroid application
-        description_label = QLabel(
-            t("about.description", language=self.language)
-        )
+        description_label = QLabel(t("about.description", language=self.language))
         description_font = QFont(self.font_family, 20, QFont.Weight.Medium)
         description_label.setFont(description_font)
         if self.dark_theme == "dark":
@@ -192,9 +190,7 @@ class AboutDialog(QDialog):
         description_label.setContentsMargins(0, 0, 0, 0)
 
         # Label for the license of PowDroid
-        license_label = QLabel(
-            t("about.license", language=self.language)
-        )
+        license_label = QLabel(t("about.license", language=self.language))
         license_font = QFont(self.font_family, 20)
         license_font.setItalic(True)
         license_label.setFont(license_font)
@@ -290,4 +286,3 @@ class AboutDialog(QDialog):
 
                 """
             )
-

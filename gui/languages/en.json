@@ -3,6 +3,21 @@
     "about": {
         "description": "PowDroid is a battery consumption profiler tool for Android devices.",
         "license": "Licensed under the MIT License.",
-        "github_repo": "GitHub Repository"
+        "github_repo": "GITHUB REPOSITORY"
+    },
+    "check_config": {
+        "title": "CHECKING CONFIGURATION...",
+        "android_sdk": "Android SDK",
+        "adb_server": "ADB Server",
+        "python_version": "Python Version",
+        "pandas_library": "Pandas Library",
+        "gui_module": "GUI Module",
+        "go_runtime": "Go Runtime",
+        "status" : {
+            "ok": "OK",
+            "failed": "FAILED",
+            "error": "ERROR",
+            "in_progress": "IN PROGRESS..."
+        }
     }
 }
