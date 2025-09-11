@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QSize, QRect, QUrl
 from PyQt6.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QFontDatabase
 from typing import Optional
+from gui.i18n import t 
 import os
 
 
@@ -49,7 +50,9 @@ class AboutDialog(QDialog):
                     self.font_family = families[0]
                     break
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(
+        self, parent: Optional[QWidget] = None, dark_theme="dark", language="en"
+    ):
         """
         Initialize the About dialog.
 
@@ -57,6 +60,8 @@ class AboutDialog(QDialog):
             parent: Parent widget (optional)
         """
         super().__init__(parent)
+        self.dark_theme = dark_theme
+        self.language = language
         self.setModal(True)
         self.setFixedSize(550, 573)
 
@@ -88,14 +93,24 @@ class AboutDialog(QDialog):
 
         # Cross button on the top right corner to close the dialog based on an icon
         close_button = QLabel(self)
-        close_button.setPixmap(
-            QPixmap("gui/ressources/close.png").scaled(
-                40,
-                40,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
+        if self.dark_theme == "dark":
+            close_button.setPixmap(
+                QPixmap("gui/ressources/close_white.png").scaled(
+                    40,
+                    40,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
             )
-        )
+        else:
+            close_button.setPixmap(
+                QPixmap("gui/ressources/close.png").scaled(
+                    40,
+                    40,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
         close_button.setFixedSize(40, 40)
         close_button.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -109,12 +124,20 @@ class AboutDialog(QDialog):
         title_label = QLabel("ABOUT")
         title_font = QFont(self.font_family, 24, QFont.Weight.DemiBold)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #000000;")
+        if self.dark_theme == "dark":
+            title_label.setStyleSheet("color: #D2D2D2;")
+        else:
+            title_label.setStyleSheet("color: #000000;")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_frame = QFrame()
-        title_frame.setStyleSheet(
-            "background-color: #EEEEEE; border: 1px solid #D9D9D9; border-radius: 8px;"
-        )
+        if self.dark_theme == "dark":
+            title_frame.setStyleSheet(
+                "background-color: #282828; border: 1px solid #3C3C3C; border-radius: 8px;"
+            )
+        else:
+            title_frame.setStyleSheet(
+                "background-color: #EEEEEE; border: 1px solid #D9D9D9; border-radius: 8px;"
+            )
         title_frame.setFixedSize(499, 49)
         title_layout = QHBoxLayout()
         title_layout.addWidget(title_label)
@@ -146,38 +169,55 @@ class AboutDialog(QDialog):
         version_label = QLabel("v1.0")
         version_font = QFont(self.font_family, 20, QFont.Weight.Medium)
         version_label.setFont(version_font)
-        version_label.setStyleSheet("color: #000000;")
+        if self.dark_theme == "dark":
+            version_label.setStyleSheet("color: #D2D2D2;")
+        else:
+            version_label.setStyleSheet("color: #000000;")
+
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         version_label.setContentsMargins(0, 0, 0, 0)
 
         # Label for the description of PowDroid application
         description_label = QLabel(
-            "PowDroid is a battery consumption profiler tool for Android devices."
+            t("about.description", language=self.language)
         )
         description_font = QFont(self.font_family, 20, QFont.Weight.Medium)
         description_label.setFont(description_font)
-        description_label.setStyleSheet("color: #000000;")
+        if self.dark_theme == "dark":
+            description_label.setStyleSheet("color: #D2D2D2;")
+        else:
+            description_label.setStyleSheet("color: #000000;")
         description_label.setWordWrap(True)
         description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         description_label.setContentsMargins(0, 0, 0, 0)
 
         # Label for the license of PowDroid
-        license_label = QLabel("PowDroid is licensed under the MIT License")
+        license_label = QLabel(
+            t("about.license", language=self.language)
+        )
         license_font = QFont(self.font_family, 20)
         license_font.setItalic(True)
         license_label.setFont(license_font)
-        license_label.setStyleSheet("color: #000000;")
+        if self.dark_theme == "dark":
+            license_label.setStyleSheet("color: #D2D2D2;")
+        else:
+            license_label.setStyleSheet("color: #000000;")
         license_label.setWordWrap(True)
         license_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         license_label.setContentsMargins(0, 0, 0, 0)
 
         # Button with the GitHub logo and a title that opens the GitHub page of PowDroid when clicked
-        github_button = QPushButton("GITHUB REPOSITORY")
+        github_button = QPushButton(t("about.github_repo", language=self.language))
         github_button.setIcon(QIcon("gui/ressources/github.png"))
         github_button.setIconSize(QSize(40, 40))
-        github_button.setStyleSheet(
-            "QPushButton { color: #000000; background-color: #EEEEEE; border: 1px solid #D9D9D9; border-radius: 8px; text-align: center; padding: 0px; } QPushButton:hover { background-color: #E0E0E0; }"
-        )
+        if self.dark_theme == "dark":
+            github_button.setStyleSheet(
+                "QPushButton { color: #D2D2D2; background-color: #282828; border: 1px solid #3C3C3C; border-radius: 8px; text-align: center; padding: 0px; } QPushButton:hover { background-color: #3C3C3C; }"
+            )
+        else:
+            github_button.setStyleSheet(
+                "QPushButton { color: #000000; background-color: #EEEEEE; border: 1px solid #D9D9D9; border-radius: 8px; text-align: center; padding: 0px; } QPushButton:hover { background-color: #E0E0E0; }"
+            )
         github_button.setCursor(Qt.CursorShape.PointingHandCursor)
         github_button.clicked.connect(
             lambda: QDesktopServices.openUrl(
@@ -219,29 +259,35 @@ class AboutDialog(QDialog):
 
     def setup_styles(self):
         """Configure CSS styles for the main dialog."""
-        self.setStyleSheet(
+        if self.dark_theme == "dark":
+            self.setStyleSheet(
+                """
+                /* Main dialog style (transparent) */
+                AboutDialog {
+                    background-color: transparent;
+                }
+                
+                /* Main frame style with rounded corners */
+                QFrame {
+                    border-radius: 5px;
+                    background-color: #1D1D1D ;
+                }
             """
-            /* Main dialog style (transparent) */
-            AboutDialog {
-                background-color: transparent;
-            }
-            
-            /* Main frame style with rounded corners */
-            QFrame {
-                border-radius: 5px;
-                background-color: white;
-            }
+            )
+        else:
+            self.setStyleSheet(
+                """
+                /* Main dialog style (transparent) */
+                AboutDialog {
+                    background-color: transparent;
+                }
+                
+                /* Main frame style with rounded corners */
+                QFrame {
+                    border-radius: 5px;
+                    background-color: white;
+                }
 
-            """
-        )
+                """
+            )
 
-
-if __name__ == "__main__":
-    # Test the dialog
-    import sys
-    from PyQt6.QtWidgets import QApplication
-
-    app = QApplication(sys.argv)
-    dialog = AboutDialog()
-    dialog.show()
-    sys.exit(app.exec())

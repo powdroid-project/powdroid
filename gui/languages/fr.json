@@ -1,0 +1,8 @@
+{
+    "language": "Français",
+    "about": {
+        "description": "PowDroid est un outil de profilage de la consommation de batterie pour les appareils Android.",
+        "license": "Sous licence MIT.",
+        "github_repo": "Dépôt GitHub"
+    }
+}
