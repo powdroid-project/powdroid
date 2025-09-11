@@ -1,19 +1,13 @@
-#!/usr/bin/env python3
-"""
-Système d'internationalisation pour PowDroid - Version PyQt5
-Gère le chargement et la sélection des langues.
-"""
-
 import json
 import os
 from typing import Dict, Any
 
 
 class I18nManager:
-    """Gestionnaire de l'internationalisation."""
+    """Internationalization manager."""
 
     def __init__(self):
-        self.current_language = "en"  # Langue par défaut
+        self.current_language = "en"  # Default language
         self.translations = {}
         self.languages_dir = os.path.join(os.path.dirname(__file__), "languages")
         self.config_file = os.path.join(
@@ -21,7 +15,7 @@ class I18nManager:
         )
         self.available_languages = self._get_available_languages()
 
-        # Charger la langue sauvegardée ou utiliser la langue par défaut
+        # Load saved language or use default language
         saved_language = self._load_saved_language()
         if saved_language and saved_language in self.available_languages:
             self.current_language = saved_language
@@ -29,22 +23,22 @@ class I18nManager:
         self.load_language(self.current_language)
 
     def _get_available_languages(self) -> Dict[str, str]:
-        """Retourne la liste des langues disponibles."""
+        """Returns the list of available languages."""
         return {"fr": "Français", "en": "English"}
 
     def _load_saved_language(self) -> str:
-        """Charge la langue sauvegardée depuis le fichier de configuration."""
+        """Loads the saved language from the configuration file."""
         try:
             if os.path.exists(self.config_file):
                 with open(self.config_file, "r", encoding="utf-8") as f:
                     config = json.load(f)
                     return config.get("language", "en")
         except (json.JSONDecodeError, IOError) as e:
-            print(f"[I18n] Erreur lors du chargement de la configuration: {e}")
+            print(f"[I18n] Error loading configuration: {e}")
         return "en"
 
     def _save_language_preference(self, language_code: str) -> bool:
-        """Sauvegarde la préférence de langue dans le fichier de configuration."""
+        """Saves the language preference in the configuration file."""
         try:
             config = {}
 
@@ -60,53 +54,53 @@ class I18nManager:
             with open(self.config_file, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
 
-            print(f"[I18n] Préférence de langue sauvegardée: {language_code}")
+            print(f"[I18n] Language preference saved: {language_code}")
             return True
 
         except (IOError, OSError) as e:
-            print(f"[I18n] Erreur lors de la sauvegarde de la langue: {e}")
+            print(f"[I18n] Error saving language: {e}")
             return False
 
     def load_language(self, language_code: str) -> bool:
         """
-        Charge les traductions pour une langue donnée.
+        Loads translations for a given language.
 
         Args:
-            language_code: Code de la langue (ex: 'fr', 'en')
+            language_code: Language code (e.g., 'fr', 'en')
 
         Returns:
-            bool: True si le chargement a réussi, False sinon
+            bool: True if loading succeeded, False otherwise
         """
         if language_code not in self.available_languages:
-            print(f"[I18n] Langue non supportée: {language_code}")
+            print(f"[I18n] Unsupported language: {language_code}")
             return False
 
         language_file = os.path.join(self.languages_dir, f"{language_code}.json")
 
         if not os.path.exists(language_file):
-            print(f"[I18n] Fichier de langue manquant: {language_file}")
+            print(f"[I18n] Missing language file: {language_file}")
             return False
 
         try:
             with open(language_file, "r", encoding="utf-8") as f:
                 self.translations = json.load(f)
             self.current_language = language_code
-            print(f"[I18n] Langue chargée: {self.available_languages[language_code]}")
+            print(f"[I18n] Language loaded: {self.available_languages[language_code]}")
             return True
         except (json.JSONDecodeError, IOError) as e:
-            print(f"[I18n] Erreur lors du chargement de {language_file}: {e}")
+            print(f"[I18n] Error loading {language_file}: {e}")
             return False
 
     def get_text(self, key: str, **kwargs) -> str:
         """
-        Récupère un texte traduit par sa clé.
+        Retrieves a translated text by its key.
 
         Args:
-            key: Clé de traduction (ex: 'homepage.title')
-            **kwargs: Variables à remplacer dans le texte
+            key: Translation key (e.g., 'homepage.title')
+            **kwargs: Variables to replace in the text
 
         Returns:
-            str: Texte traduit ou clé si non trouvée
+            str: Translated text or key if not found
         """
         keys = key.split(".")
         value = self.translations
@@ -119,35 +113,20 @@ class I18nManager:
                 try:
                     value = value.format(**kwargs)
                 except KeyError as e:
-                    print(f"[I18n] Variable manquante dans '{key}': {e}")
+                    print(f"[I18n] Missing variable in '{key}': {e}")
 
             return value
         except (KeyError, TypeError):
-            print(f"[I18n] Clé de traduction manquante: {key}")
+            print(f"[I18n] Missing translation key: {key}")
             return key
 
     def get_current_language(self) -> str:
-        """Retourne le code de la langue actuelle."""
+        """Returns the current language code."""
         return self.current_language
 
     def get_available_languages(self) -> Dict[str, str]:
-        """Retourne la liste des langues disponibles."""
+        """Returns the list of available languages."""
         return self.available_languages
-
-    def switch_language(self, language_code: str) -> bool:
-        """
-        Change la langue active et sauvegarde la préférence.
-
-        Args:
-            language_code: Code de la nouvelle langue
-
-        Returns:
-            bool: True si le changement a réussi
-        """
-        if self.load_language(language_code):
-            self._save_language_preference(language_code)
-            return True
-        return False
 
 
 _i18n_manager = I18nManager()
@@ -155,40 +134,32 @@ _i18n_manager = I18nManager()
 
 def get_text(key: str, **kwargs) -> str:
     """
-    Fonction raccourci pour récupérer un texte traduit.
+    Shortcut function to retrieve a translated text.
 
     Args:
-        key: Clé de traduction
-        **kwargs: Variables à remplacer
+        key: Translation key
+        **kwargs: Variables to replace
 
     Returns:
-        str: Texte traduit
+        str: Translated text
     """
     return _i18n_manager.get_text(key, **kwargs)
 
 
-def switch_language(language_code: str) -> bool:
-    """
-    Fonction raccourci pour changer la langue.
-
-    Args:
-        language_code: Code de la langue
-
-    Returns:
-        bool: True si le changement a réussi
-    """
-    return _i18n_manager.switch_language(language_code)
-
-
 def get_current_language() -> str:
-    """Retourne le code de la langue actuelle."""
+    """Returns the current language code."""
     return _i18n_manager.get_current_language()
 
 
 def get_available_languages() -> Dict[str, str]:
-    """Retourne la liste des langues disponibles."""
+    """Returns the list of available languages."""
     return _i18n_manager.get_available_languages()
 
 
-# Alias pour compatibilité
+def get_language(language_code: str) -> str:
+    """Returns the language name for a given code."""
+    return _i18n_manager.available_languages.get(language_code, "Unknown")
+
+
+# Alias for compatibility
 t = get_text  # Usage: t("homepage.title")

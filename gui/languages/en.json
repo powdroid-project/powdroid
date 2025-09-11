@@ -1,0 +1,8 @@
+{
+    "language": "English",
+    "about": {
+        "description": "PowDroid is a battery consumption profiler tool for Android devices.",
+        "license": "Licensed under the MIT License.",
+        "github_repo": "GitHub Repository"
+    }
+}
