@@ -2,10 +2,12 @@ import sys
 import os
 import json
 
+
 # Add parent directory to PYTHONPATH for imports
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from gui.popup.information_plug_phone import InformationPopup
 from gui.popup.about import AboutDialog
 from gui.popup.check_config import CheckConfigDialog
 
@@ -41,6 +43,11 @@ def main():
 
     if checkConfig.exec() == QDialog.DialogCode.Accepted:
         # If configuration check passed, show the about dialog
+
+        informationPopup = InformationPopup(
+            dark_theme=current_theme, language=current_language, plugged=False
+        )
+        informationPopup.exec()
 
         aboutDialog = AboutDialog(dark_theme=current_theme, language=current_language)
         aboutDialog.exec()

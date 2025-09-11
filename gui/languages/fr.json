@@ -19,5 +19,10 @@
             "error": "ERREUR",
             "in_progress": "EN COURS..."
         }
+    },
+    "information_popup": {
+        "title": "INFORMATION",
+        "plug": "Veuillez connecter votre appareil pour finir l'enregistrement.",
+        "unplug": "Vous pouvez déconnecter votre appareil pour commencer l'enregistrement."
     }
 }
