@@ -21,6 +21,7 @@ import os
 
 class CheckWorker(QThread):
     """Worker thread for performing configuration checks."""
+
     finished = pyqtSignal(str, object)  # check_name, CheckResult
     error = pyqtSignal(str, str)  # check_name, error_message
 
@@ -80,7 +81,7 @@ class CheckConfigDialog(QDialog):
             movie.setScaledSize(QSize(41, 41))
             icon_label.setMovie(movie)
             movie.start()
-            movie.setSpeed(100)  
+            movie.setSpeed(100)
         elif success:
             icon_label.setPixmap(
                 QPixmap("gui/ressources/check.png").scaled(
@@ -129,11 +130,20 @@ class CheckConfigDialog(QDialog):
 
         self.checks_config = [
             (t("check_config.android_sdk", language=self.language), check_android_sdk),
-            (t("check_config.python_version", language=self.language), check_python_version),
-            (t("check_config.pandas_library", language=self.language), check_pandas_module),
+            (
+                t("check_config.python_version", language=self.language),
+                check_python_version,
+            ),
+            (
+                t("check_config.pandas_library", language=self.language),
+                check_pandas_module,
+            ),
             (t("check_config.gui_module", language=self.language), check_gui_modules),
             (t("check_config.go_runtime", language=self.language), check_go_runtime),
-            (t("check_config.adb_server", language=self.language), initialize_adb_server),
+            (
+                t("check_config.adb_server", language=self.language),
+                initialize_adb_server,
+            ),
         ]
         self.status_widgets = []
         self.current_check = 0
@@ -253,7 +263,9 @@ class CheckConfigDialog(QDialog):
         """Perform the next configuration check."""
         if self.current_check >= len(self.checks_config):
             # All checks completed successfully
-            QTimer.singleShot(500, lambda: self.accept())  # Wait a bit then close with accepted status
+            QTimer.singleShot(
+                500, lambda: self.accept()
+            )  # Wait a bit then close with accepted status
             return
 
         check_name, check_function = self.checks_config[self.current_check]
@@ -268,12 +280,12 @@ class CheckConfigDialog(QDialog):
         success = check_result.success
         status_text = f"{check_name}: {t('check_config.status.ok', language=self.language) if success else t('check_config.status.failed', language=self.language)}"
         self.update_check_widget(status_text, success)
-        
+
         if not success:
             # If check failed, close dialog with rejected status after a delay
             QTimer.singleShot(2000, lambda: self.reject())
             return
-            
+
         self.current_check += 1
         QTimer.singleShot(50, self.perform_next_check)
 
@@ -282,7 +294,7 @@ class CheckConfigDialog(QDialog):
         print(f"Error in {check_name}: {error_message}")
         status_text = f"{check_name}: ERROR"
         self.update_check_widget(status_text, False)
-        
+
         # If there's an error, close dialog with rejected status after a delay
         QTimer.singleShot(2000, lambda: self.reject())
 

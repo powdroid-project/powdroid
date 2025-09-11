@@ -43,7 +43,7 @@ def main():
         # If configuration check passed, show the about dialog
 
         aboutDialog = AboutDialog(dark_theme=current_theme, language=current_language)
-        aboutDialog.exec()  
+        aboutDialog.exec()
     else:
         sys.exit(1)
 
