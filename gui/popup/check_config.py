@@ -148,6 +148,7 @@ class CheckConfigDialog(QDialog):
         self.status_widgets = []
         self.current_check = 0
         self.current_worker = None
+        self.has_failures = False  # Track if any check failed
 
         self.load_fonts()
 
@@ -262,10 +263,13 @@ class CheckConfigDialog(QDialog):
     def perform_next_check(self):
         """Perform the next configuration check."""
         if self.current_check >= len(self.checks_config):
-            # All checks completed successfully
-            QTimer.singleShot(
-                500, lambda: self.accept()
-            )  # Wait a bit then close with accepted status
+            # All checks completed
+            if not self.has_failures:
+                # Only close if all checks passed
+                QTimer.singleShot(
+                    500, lambda: self.accept()
+                )  # Wait a bit then close with accepted status
+            # If there are failures, keep the dialog open
             return
 
         check_name, check_function = self.checks_config[self.current_check]
@@ -282,10 +286,10 @@ class CheckConfigDialog(QDialog):
         self.update_check_widget(status_text, success)
 
         if not success:
-            # If check failed, close dialog with rejected status after a delay
-            QTimer.singleShot(2000, lambda: self.reject())
-            return
+            # Mark that we have failures
+            self.has_failures = True
 
+        # Continue to next check regardless of success/failure
         self.current_check += 1
         QTimer.singleShot(50, self.perform_next_check)
 
@@ -295,8 +299,12 @@ class CheckConfigDialog(QDialog):
         status_text = f"{check_name}: ERROR"
         self.update_check_widget(status_text, False)
 
-        # If there's an error, close dialog with rejected status after a delay
-        QTimer.singleShot(2000, lambda: self.reject())
+        # Mark that we have failures
+        self.has_failures = True
+
+        # Continue to next check even if there was an error
+        self.current_check += 1
+        QTimer.singleShot(50, self.perform_next_check)
 
     def update_check_widget(self, status_text, result):
         """Update the widget for the current check."""
