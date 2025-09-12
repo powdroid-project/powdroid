@@ -121,30 +121,23 @@ class InformationPopup(QDialog):
         title_frame.setLayout(title_layout)
 
         picture_label = QLabel()
+        picture_label.setPixmap(
+            QPixmap("gui/ressources/plug_the_phone.png").scaled(
+                184,
+                184,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
         if self.plugged:
             message_label = QLabel(
                 t("information_popup.unplug", language=self.language)
             )
-            picture_label.setPixmap(
-                QPixmap("gui/ressources/phone_plugged.png").scaled(
-                    184,
-                    184,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-            )
+
         else:
             message_label = QLabel(t("information_popup.plug", language=self.language))
-            picture_label.setPixmap(
-                QPixmap("gui/ressources/plug_the_phone.png").scaled(
-                    184,
-                    184,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-            )
 
-        message_font = QFont(self.font_family, 24, QFont.Weight.DemiBold)
+        message_font = QFont(self.font_family, 20, QFont.Weight.DemiBold)
         message_font.setItalic(True)
         message_label.setFont(message_font)
         message_label.setWordWrap(True)

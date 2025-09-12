@@ -22,7 +22,7 @@
     },
     "information_popup": {
         "title": "INFORMATION",
-        "plug": "Please connect your device to complete the recording.",
-        "unplug": "You can disconnect your device to start the recording."
+        "plug": "Please <b style='color: #57C18B;'>PLUG</b> your device to complete the recording.",
+        "unplug": "You can <b style='color: #57C18B;'>UNPLUG</b> your device to start the recording."
     }
 }

@@ -31,6 +31,8 @@ def load_config():
 def main():
     """Main function for the GUI interface"""
     from PyQt6.QtWidgets import QApplication, QDialog
+    from PyQt6.QtCore import QTimer
+    import time
 
     app = QApplication(sys.argv)
 
@@ -42,15 +44,50 @@ def main():
     checkConfig = CheckConfigDialog(dark_theme=current_theme, language=current_language)
 
     if checkConfig.exec() == QDialog.DialogCode.Accepted:
-        # If configuration check passed, show the about dialog
 
-        informationPopup = InformationPopup(
+        # Variables globales pour garder les références
+        popup1 = None
+        popup2 = None
+        timer1 = None
+        timer2 = None
+
+        def show_second_popup():
+            nonlocal popup2, timer2
+            # Show second popup (plugged)
+            popup2 = InformationPopup(
+                dark_theme=current_theme, language=current_language, plugged=True
+            )
+            popup2.show()
+
+            # Timer to close second popup
+            timer2 = QTimer()
+            timer2.timeout.connect(popup2.close)
+            timer2.timeout.connect(show_about_dialog)
+            timer2.setSingleShot(True)
+            timer2.start(3000)
+
+        def show_about_dialog():
+            aboutDialog = AboutDialog(
+                dark_theme=current_theme, language=current_language
+            )
+            aboutDialog.exec()
+            app.quit()  # Quitter l'application après le dialog About
+
+        # Show first popup (unplugged)
+        popup1 = InformationPopup(
             dark_theme=current_theme, language=current_language, plugged=False
         )
-        informationPopup.exec()
+        popup1.show()
 
-        aboutDialog = AboutDialog(dark_theme=current_theme, language=current_language)
-        aboutDialog.exec()
+        # Timer to close first popup and show second
+        timer1 = QTimer()
+        timer1.timeout.connect(popup1.close)
+        timer1.timeout.connect(show_second_popup)
+        timer1.setSingleShot(True)
+        timer1.start(3000)
+
+        # Start the event loop
+        app.exec()
     else:
         sys.exit(1)
 
