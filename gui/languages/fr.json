@@ -19,5 +19,10 @@
             "error": "ERREUR",
             "in_progress": "EN COURS..."
         }
+    },
+    "information_popup": {
+        "title": "INFORMATION",
+        "plug": "Veuillez <b style='color: #57C18B;'>CONNECTER</b> votre appareil pour finir l'enregistrement.",
+        "unplug": "Vous pouvez <b style='color: #57C18B;'>DECONNECTER</b> votre appareil pour commencer l'enregistrement."
     }
 }
