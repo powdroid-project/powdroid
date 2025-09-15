@@ -31,6 +31,7 @@ from core.utils import adb_runner
 import os
 
 from gui.popup.about import AboutDialog
+from gui.pages.record_page import RecordDialog
 
 
 class CollapsibleBox(QWidget):
@@ -94,6 +95,55 @@ class MainDialog(QDialog):
     "Main" frame.
     """
 
+    def __init__(
+        self, parent: Optional[QWidget] = None, dark_theme="dark", language="en"
+    ):
+        """
+        Initialize the Main frame.
+
+        Args:
+            parent: Parent widget (optional)
+        """
+        super().__init__(parent)
+        self.dark_theme = dark_theme
+        self.language = language
+        self.setModal(True)
+        self.setFixedSize(550, 900)
+
+        self.previous_device_status = None
+        
+        # Variables pour le déplacement de la fenêtre
+        self.dragging = False
+        self.drag_position = None
+
+        self.load_fonts()
+
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        self.setup_ui()
+        self.setup_styles()
+
+    # Ajouter ces méthodes pour gérer le déplacement :
+    def mousePressEvent(self, event):
+        """Handle mouse press for window dragging."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.dragging = True
+            self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        """Handle mouse move for window dragging."""
+        if event.buttons() == Qt.MouseButton.LeftButton and self.dragging:
+            self.move(event.globalPosition().toPoint() - self.drag_position)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release to stop dragging."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.dragging = False
+            event.accept()
+
     def load_fonts(self):
         """Loads custom fonts from the fonts folder."""
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -121,31 +171,6 @@ class MainDialog(QDialog):
     def show_about_page(self):
         dialog = AboutDialog(self, dark_theme=self.dark_theme, language=self.language)
         dialog.exec()
-
-    def __init__(
-        self, parent: Optional[QWidget] = None, dark_theme="dark", language="en"
-    ):
-        """
-        Initialize the Main frame.
-
-        Args:
-            parent: Parent widget (optional)
-        """
-        super().__init__(parent)
-        self.dark_theme = dark_theme
-        self.language = language
-        self.setModal(True)
-        self.setFixedSize(550, 900)
-
-        self.previous_device_status = None
-
-        self.load_fonts()
-
-        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-
-        self.setup_ui()
-        self.setup_styles()
 
     def setup_ui(self):
         """Configure the user interface."""
@@ -312,6 +337,7 @@ class MainDialog(QDialog):
         github_font = QFont(self.font_family, 24, QFont.Weight.DemiBold)
         record_button.setFont(github_font)
         record_button.setFixedSize(499, 100)
+        record_button.clicked.connect(self.show_record_page)
 
         instructions_group = CollapsibleBox("Instructions", content_size=(499, 216))
         instructions_group.toggle_button.setFont(QFont(self.font_family, 24, QFont.Weight.DemiBold))
@@ -489,6 +515,17 @@ class MainDialog(QDialog):
             self.phone_image.setFont(icon_font)
 
         self.status_label.setText(status_text)
+
+    def show_record_page(self):
+        """Show the recording page."""
+        record_dialog = RecordDialog(self, dark_theme=self.dark_theme, language=self.language)
+        record_dialog.recording_finished.connect(self.on_recording_finished)
+        record_dialog.exec()
+
+    def on_recording_finished(self):
+        """Handle when recording is finished."""
+        # Actions à effectuer après l'enregistrement
+        pass
 
     def setup_styles(self):
         """Configure CSS styles for the main dialog."""

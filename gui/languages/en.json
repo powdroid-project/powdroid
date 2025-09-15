@@ -35,6 +35,12 @@
             "title": "Instructions",
             "content": "Connect your Android smartphone via USB\nEnable USB debugging in developer options\nClick 'START RECORDING' to start monitoring\nFollow the on-screen instructions."
         }
+    },
+    "record": {
+        "title": "RECORDING...",
+        "status": "Ready to record",
+        "start": "Start Recording",
+        "stop": "Stop Recording"
     }
 
 }
