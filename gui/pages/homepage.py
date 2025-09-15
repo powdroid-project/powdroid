@@ -20,9 +20,6 @@ from PyQt6.QtCore import (
     QSize,
     QRect,
     QUrl,
-    QPropertyAnimation,
-    QParallelAnimationGroup,
-    QAbstractAnimation,
     pyqtSlot,
     QTimer,
 )
@@ -37,8 +34,10 @@ from gui.popup.about import AboutDialog
 
 
 class CollapsibleBox(QWidget):
-    def __init__(self, title="", parent=None):
+    def __init__(self, title="", parent=None, content_size=None):
         super(CollapsibleBox, self).__init__(parent)
+        
+        self.content_size = content_size  # Store the desired content size
 
         self.toggle_button = QToolButton(text=title, checkable=True, checked=False)
         self.toggle_button.setStyleSheet("QToolButton { border: none; }")
@@ -46,9 +45,10 @@ class CollapsibleBox(QWidget):
             Qt.ToolButtonStyle.ToolButtonTextBesideIcon
         )
         self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
-        self.toggle_button.pressed.connect(self.on_pressed)
-
-        self.toggle_animation = QParallelAnimationGroup(self)
+        self.toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.toggle_button.setMinimumSize(QSize(499, 30))
+        self.toggle_button.clicked.connect(self.on_clicked)
+        
 
         self.content_area = QScrollArea(maximumHeight=0, minimumHeight=0)
         self.content_area.setSizePolicy(
@@ -62,43 +62,31 @@ class CollapsibleBox(QWidget):
         lay.addWidget(self.toggle_button)
         lay.addWidget(self.content_area)
 
-        self.toggle_animation.addAnimation(QPropertyAnimation(self, b"minimumHeight"))
-        self.toggle_animation.addAnimation(QPropertyAnimation(self, b"maximumHeight"))
-        self.toggle_animation.addAnimation(
-            QPropertyAnimation(self.content_area, b"maximumHeight")
-        )
-
     @pyqtSlot()
-    def on_pressed(self):
+    def on_clicked(self):
         checked = self.toggle_button.isChecked()
         self.toggle_button.setArrowType(
-            Qt.ArrowType.DownArrow if not checked else Qt.ArrowType.RightArrow
+            Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow
         )
-        self.toggle_animation.setDirection(
-            QAbstractAnimation.Direction.Forward
-            if not checked
-            else QAbstractAnimation.Direction.Backward
-        )
-        self.toggle_animation.start()
+        # Toggle the content area visibility directly without animation
+        if checked:
+            # Show content with specific size if provided
+            if self.content_size:
+                self.content_area.setFixedSize(self.content_size[0], self.content_size[1])
+                self.content_area.setMaximumHeight(self.content_size[1])
+            else:
+                self.content_area.setMaximumHeight(16777215)  # Large value to allow expansion
+        else:
+            # Hide content
+            self.content_area.setMaximumHeight(0)
+            self.content_area.setMinimumHeight(0)
+            # Reset fixed size to allow proper hiding
+            self.content_area.setFixedSize(0, 0)
 
     def setContentLayout(self, layout):
         lay = self.content_area.layout()
         del lay
         self.content_area.setLayout(layout)
-        collapsed_height = self.sizeHint().height() - self.content_area.maximumHeight()
-        content_height = layout.sizeHint().height()
-        for i in range(self.toggle_animation.animationCount()):
-            animation = self.toggle_animation.animationAt(i)
-            animation.setDuration(500)
-            animation.setStartValue(collapsed_height)
-            animation.setEndValue(collapsed_height + content_height)
-
-        content_animation = self.toggle_animation.animationAt(
-            self.toggle_animation.animationCount() - 1
-        )
-        content_animation.setDuration(500)
-        content_animation.setStartValue(0)
-        content_animation.setEndValue(content_height)
 
 
 class MainDialog(QDialog):
@@ -325,13 +313,13 @@ class MainDialog(QDialog):
         record_button.setFont(github_font)
         record_button.setFixedSize(499, 100)
 
-        instructions_group = CollapsibleBox("Instructions")
-        instructions_group.toggle_button.setFont(QFont(self.font_family, 10))
+        instructions_group = CollapsibleBox("Instructions", content_size=(499, 216))
+        instructions_group.toggle_button.setFont(QFont(self.font_family, 24, QFont.Weight.DemiBold))
 
         instructions_content_layout = QVBoxLayout()
-        instructions_label = QLabel("")
+        instructions_label = QLabel(t("homepage.instructions.content"))
+        instructions_label.setFont(QFont(self.font_family, 16, QFont.Weight.Normal))
         instructions_label.setWordWrap(True)
-        instructions_label.setFont(QFont(self.font_family, 9))
 
         instructions_content_layout.addWidget(instructions_label)
         instructions_group.setContentLayout(instructions_content_layout)

@@ -30,7 +30,11 @@
             "connected": "Connected device",
             "disconnected": "No device detected"
         },
-        "record_button": "START RECORDING"
+        "record_button": "START RECORDING",
+        "instructions": {
+            "title": "Instructions",
+            "content": "Connect your Android smartphone via USB\nEnable USB debugging in developer options\nClick 'START RECORDING' to start monitoring\nFollow the on-screen instructions."
+        }
     }
 
 }
