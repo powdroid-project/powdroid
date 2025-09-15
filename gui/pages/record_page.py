@@ -10,8 +10,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QProgressBar,
-    QTextEdit,
     QWidget,
     QFrame,
 )
@@ -37,7 +35,6 @@ class DataProcessingWorker(QThread):
     def run(self):
         """Process the recording data in a separate thread."""
         try:
-            print("[PowDroid] Starting data processing in worker thread")
 
             # Dump battery stats
             adb_runner.dump_batterystats(True)
@@ -64,7 +61,6 @@ class RecordDialog(QDialog):
     Record page for PowDroid.
     """
 
-    # Signal émis quand l'enregistrement est terminé
     recording_finished = pyqtSignal()
 
     def __init__(
@@ -81,11 +77,9 @@ class RecordDialog(QDialog):
         self.setModal(True)
         self.setFixedSize(550, 900)
 
-        # Variables pour le déplacement de la fenêtre
         self.dragging = False
         self.drag_position = None
 
-        # Variables pour le timer d'enregistrement
         self.recording_timer = QTimer()
         self.recording_timer.timeout.connect(self.update_duration)
         self.recording_seconds = 0
@@ -101,11 +95,9 @@ class RecordDialog(QDialog):
         self.setup_ui()
         self.setup_styles()
 
-        # Démarrer automatiquement l'enregistrement si demandé
         if self.auto_start:
             self.start_recording_timer()
 
-    # Ajouter ces méthodes pour gérer le déplacement de la fenêtre
     def mousePressEvent(self, event):
         """Handle mouse press for window dragging."""
         if event.button() == Qt.MouseButton.LeftButton:
@@ -142,13 +134,13 @@ class RecordDialog(QDialog):
             self.recording_timer.stop()
 
     def update_duration(self):
-        """Met à jour l'affichage de la durée d'enregistrement."""
+        """Update the recording duration display."""
         self.recording_seconds += 1
         if hasattr(self, "duration_label"):
             self.duration_label.setText(self.format_duration(self.recording_seconds))
 
     def format_duration(self, seconds):
-        """Formate la durée en HH:MM:SS."""
+        """Format duration in HH:MM:SS."""
         hours = seconds // 3600
         minutes = (seconds % 3600) // 60
         secs = seconds % 60
@@ -265,13 +257,11 @@ class RecordDialog(QDialog):
 
     def _create_loading_spinner(self):
         """Create loading spinner widget with message using the loading.gif resource."""
-        # Create container widget for spinner and message
         self.loading_label = QWidget()
         loading_layout = QVBoxLayout()
         loading_layout.setSpacing(10)
         loading_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Create spinner label
         spinner_label = QLabel()
         gif_path = "gui/ressources/loading.gif"
         if not os.path.exists(gif_path):
@@ -290,7 +280,6 @@ class RecordDialog(QDialog):
 
         spinner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Create message label
         message_label = QLabel("Please wait. It may take a while.")
         message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         message_font = QFont(self.font_family, 32, QFont.Weight.DemiBold)
@@ -419,7 +408,7 @@ class RecordDialog(QDialog):
         content_layout.addLayout(header_buttons_layout)
         content_layout.addLayout(logo_layout)
 
-        # Header with title (Not USED)
+        # Header with title
         self.title_label = QLabel(t("record.title", language=self.language))
         title_font = QFont(self.font_family, 24, QFont.Weight.DemiBold)
         self.title_label.setFont(title_font)
@@ -527,7 +516,6 @@ class RecordDialog(QDialog):
                 )
             )
 
-        # Mettre à jour le titre
         content_layout = self.main_frame.layout()
         for i in range(content_layout.count()):
             widget = content_layout.itemAt(i).widget()
@@ -542,7 +530,6 @@ class RecordDialog(QDialog):
                     widget.setStyleSheet("color: #000000; margin: 20px 0;")
                 break
 
-        # Mettre à jour le frame principal
         for i in range(content_layout.count()):
             widget = content_layout.itemAt(i).widget()
             if isinstance(widget, QFrame) and widget.size().height() == 400:
@@ -556,7 +543,6 @@ class RecordDialog(QDialog):
                     )
                 break
 
-        # Mettre à jour le bouton d'aide
         for i in range(content_layout.count()):
             widget = content_layout.itemAt(i).widget()
             if isinstance(widget, QLabel) and widget.text() == "?":
@@ -566,14 +552,12 @@ class RecordDialog(QDialog):
                     widget.setStyleSheet("color: #313131;")
                 break
 
-        # Mettre à jour le label de durée
         if hasattr(self, "duration_label"):
             if self.dark_theme == "dark":
                 self.duration_label.setStyleSheet("color: #FFFFFF; margin: 20px 0;")
             else:
                 self.duration_label.setStyleSheet("color: #000000; margin: 20px 0;")
 
-        # Mettre à jour le titre et son frame
         if hasattr(self, "title_label"):
             if self.dark_theme == "dark":
                 self.title_label.setStyleSheet("color: #D2D2D2;")

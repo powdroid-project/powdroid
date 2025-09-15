@@ -23,7 +23,7 @@ from PyQt6.QtCore import (
     pyqtSlot,
     QTimer,
 )
-from PyQt6.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QFontDatabase
+from PyQt6.QtGui import QFont, QPixmap, QIcon, QFontDatabase
 from typing import Optional
 from gui.i18n import t
 from gui.popup import *
@@ -117,7 +117,6 @@ class MainDialog(QDialog):
 
         self.previous_device_status = None
 
-        # Variables pour le déplacement de la fenêtre
         self.dragging = False
         self.drag_position = None
 
@@ -129,7 +128,6 @@ class MainDialog(QDialog):
         self.setup_ui()
         self.setup_styles()
 
-    # Ajouter ces méthodes pour gérer le déplacement :
     def mousePressEvent(self, event):
         """Handle mouse press for window dragging."""
         if event.button() == Qt.MouseButton.LeftButton:
@@ -527,7 +525,6 @@ class MainDialog(QDialog):
 
     def show_record_page(self):
         """Show the recording page."""
-        # D'abord afficher la popup pour débrancher l'appareil
         adb_runner.kill_all()
         adb_runner.clear_batterystats(verbose=True)
         self.popup = InformationPopup(
@@ -552,16 +549,14 @@ class MainDialog(QDialog):
 
     def start_recording(self):
         """Démarre l'enregistrement après déconnexion de l'appareil."""
-
         # Hide the homepage while recording
         self.hide()
 
-        # Maintenant ouvrir la page d'enregistrement avec le timer démarré
         record_dialog = RecordDialog(
             self,
             dark_theme=self.dark_theme,
             language=self.language,
-            auto_start=True,  # Démarre automatiquement le timer
+            auto_start=True,
         )
         record_dialog.recording_finished.connect(self.on_recording_finished)
         record_dialog.exec()
@@ -570,7 +565,6 @@ class MainDialog(QDialog):
         """Handle when recording is finished."""
         # Show the homepage again after recording is finished
         self.show()
-        # Actions à effectuer après l'enregistrement
         pass
 
     def setup_styles(self):
