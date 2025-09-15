@@ -530,17 +530,31 @@ class MainDialog(QDialog):
         # D'abord afficher la popup pour débrancher l'appareil
         adb_runner.kill_all()
         adb_runner.clear_batterystats(verbose=True)
-        popup = InformationPopup(
+        self.popup = InformationPopup(
             parent=self,
             plugged=True,
             dark_theme=self.dark_theme,
             language=self.language,
         )
-        popup.device_disconnected.connect(self.start_recording)
-        popup.exec()
+        self.popup.device_disconnected.connect(self.on_device_disconnected)
+        self.popup.exec()
+
+    def on_device_disconnected(self):
+        """Handle device disconnection - close popup and start recording."""
+        # Close the information popup
+        if hasattr(self, "popup") and self.popup:
+            self.popup.accept()  # Close the popup
+
+        # Start recording after a short delay to ensure popup is closed
+        from PyQt6.QtCore import QTimer
+
+        QTimer.singleShot(100, self.start_recording)
 
     def start_recording(self):
         """Démarre l'enregistrement après déconnexion de l'appareil."""
+
+        # Hide the homepage while recording
+        self.hide()
 
         # Maintenant ouvrir la page d'enregistrement avec le timer démarré
         record_dialog = RecordDialog(
@@ -554,6 +568,8 @@ class MainDialog(QDialog):
 
     def on_recording_finished(self):
         """Handle when recording is finished."""
+        # Show the homepage again after recording is finished
+        self.show()
         # Actions à effectuer après l'enregistrement
         pass
 
