@@ -39,6 +39,12 @@ class DataProcessingWorker(QThread):
             # Dump battery stats
             adb_runner.dump_batterystats(True)
 
+            # Convert battery stats to CSV
+            file_name = adb_runner.conversion_batterystats()
+
+            # Generate individual CSV files from the main CSV
+            csv_handler.generate_files(file_name)
+
             # Process CSV file
             def to_timestamp_ms(dt):
                 return int(dt.timestamp() * 1000) if isinstance(dt, datetime) else dt
