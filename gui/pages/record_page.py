@@ -30,17 +30,24 @@ class RecordDialog(QDialog):
     recording_finished = pyqtSignal()
 
     def __init__(
-        self, parent: Optional[QWidget] = None, dark_theme="dark", language="en"
+        self, parent: Optional[QWidget] = None, dark_theme="dark", language="en", auto_start=False
     ):
         super().__init__(parent)
         self.dark_theme = dark_theme
         self.language = language
+        self.auto_start = auto_start
         self.setModal(True)
         self.setFixedSize(550, 900)
 
         # Variables pour le déplacement de la fenêtre
         self.dragging = False
         self.drag_position = None
+
+        # Variables pour le timer d'enregistrement
+        self.recording_timer = QTimer()
+        self.recording_timer.timeout.connect(self.update_duration)
+        self.recording_seconds = 0
+        self.is_recording = False
 
         self.load_fonts()
 
@@ -49,6 +56,10 @@ class RecordDialog(QDialog):
 
         self.setup_ui()
         self.setup_styles()
+        
+        # Démarrer automatiquement l'enregistrement si demandé
+        if self.auto_start:
+            self.start_recording_timer()
 
     # Ajouter ces méthodes pour gérer le déplacement :
     def mousePressEvent(self, event):
@@ -71,6 +82,54 @@ class RecordDialog(QDialog):
         if event.button() == Qt.MouseButton.LeftButton:
             self.dragging = False
             event.accept()
+
+    def start_recording_timer(self):
+        """Démarre le timer d'enregistrement."""
+        if not self.is_recording:
+            self.is_recording = True
+            self.recording_timer.start(1000)  # Update every second
+            print("[PowDroid] Timer d'enregistrement démarré")
+
+    def stop_recording_timer(self):
+        """Arrête le timer d'enregistrement."""
+        if self.is_recording:
+            self.is_recording = False
+            self.recording_timer.stop()
+            print(f"[PowDroid] Enregistrement terminé: {self.format_duration(self.recording_seconds)}")
+
+    def update_duration(self):
+        """Met à jour l'affichage de la durée d'enregistrement."""
+        self.recording_seconds += 1
+        if hasattr(self, 'duration_label'):
+            self.duration_label.setText(self.format_duration(self.recording_seconds))
+
+    def format_duration(self, seconds):
+        """Formate la durée en HH:MM:SS."""
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        secs = seconds % 60
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+    def stop_recording_and_close(self):
+        """Arrête l'enregistrement et demande de rebrancher le téléphone."""
+        self.stop_recording_timer()
+        
+        # Afficher la popup pour rebrancher le téléphone
+        from gui.popup.information_plug_phone import InformationPopup
+        popup = InformationPopup(
+            parent=self,
+            plugged=False,  # Demande de brancher le téléphone
+            dark_theme=self.dark_theme,
+            language=self.language
+        )
+        popup.device_connected.connect(self.on_device_reconnected)  # Utiliser device_connected
+        popup.exec()
+
+    def on_device_reconnected(self):
+        """Appelé quand l'appareil est rebranché - termine l'enregistrement."""
+        print("[PowDroid] Téléphone rebranché, enregistrement terminé")
+        self.recording_finished.emit()
+        # Ne pas fermer la fenêtre - l'utilisateur peut voir la durée finale
 
     def load_fonts(self):
         """Loads custom fonts from the fonts folder."""
@@ -231,6 +290,9 @@ class RecordDialog(QDialog):
         github_font = QFont(self.font_family, 24, QFont.Weight.DemiBold)
         stop_button.setFont(github_font)
         stop_button.setFixedSize(499, 100)
+        
+        # Connecter le bouton stop à la méthode d'arrêt
+        stop_button.clicked.connect(self.stop_recording_and_close)
 
         # Bouton d'aide (identique à homepage)
         question_label = QLabel("?")

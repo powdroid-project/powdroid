@@ -11,17 +11,53 @@ from PyQt6.QtWidgets import (
     QWidget,
     QPushButton,
 )
-from PyQt6.QtCore import Qt, QSize, QRect, QUrl
+from PyQt6.QtCore import Qt, QSize, QRect, QUrl, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QFontDatabase
 from typing import Optional
 from gui.i18n import t
+from core.utils.adb_runner import wait_for_device_disconnection, is_device_connected
 import os
+
+
+class DeviceMonitorThread(QThread):
+    """Thread pour surveiller la connexion/déconnexion de l'appareil."""
+    
+    device_disconnected = pyqtSignal()
+    device_connected = pyqtSignal()
+    
+    def __init__(self, wait_for_connection=False, verbose=False):
+        super().__init__()
+        self.wait_for_connection = wait_for_connection
+        self.verbose = verbose
+        self.should_stop = False
+    
+    def run(self):
+        """Surveille la connexion ou déconnexion de l'appareil."""
+        if self.wait_for_connection:
+            # Attendre qu'un appareil se connecte
+            from core.utils.adb_runner import wait_for_device_connection
+            wait_for_device_connection(self.verbose)
+            if not self.should_stop:
+                self.device_connected.emit()
+        else:
+            # Attendre qu'un appareil se déconnecte
+            if is_device_connected():
+                wait_for_device_disconnection(self.verbose)
+                if not self.should_stop:
+                    self.device_disconnected.emit()
+    
+    def stop(self):
+        """Arrête la surveillance."""
+        self.should_stop = True
 
 
 class InformationPopup(QDialog):
     """
     "Instruction" dialog.
     """
+    
+    device_disconnected = pyqtSignal()  # Signal émis quand l'appareil est débranché
+    device_connected = pyqtSignal()     # Signal émis quand l'appareil est branché
 
     def load_fonts(self):
         """Loads custom fonts from the fonts folder."""
@@ -70,6 +106,9 @@ class InformationPopup(QDialog):
         self.setModal(True)
         self.setFixedSize(356, 375)
 
+        # Thread de surveillance de l'appareil
+        self.monitor_thread = None
+
         self.load_fonts()
 
         # Configuration of flags for rounded corners and remove title bar and buttons
@@ -81,6 +120,34 @@ class InformationPopup(QDialog):
         # Interface configuration
         self.setup_ui()
         self.setup_styles()
+        
+        # Toujours démarrer la surveillance si on a un appareil connecté
+        # (que ce soit pour attendre une connexion ou une déconnexion)
+        self.start_device_monitoring()
+
+    def start_device_monitoring(self):
+        """Démarre la surveillance de la connexion/déconnexion de l'appareil."""
+        # Si plugged=True, on attend une déconnexion
+        # Si plugged=False, on attend une connexion
+        wait_for_connection = not self.plugged
+        
+        self.monitor_thread = DeviceMonitorThread(
+            wait_for_connection=wait_for_connection, 
+            verbose=False
+        )
+        self.monitor_thread.device_disconnected.connect(self.on_device_disconnected)
+        self.monitor_thread.device_connected.connect(self.on_device_connected)
+        self.monitor_thread.start()
+    
+    def on_device_disconnected(self):
+        """Appelé quand l'appareil est débranché."""
+        self.device_disconnected.emit()  # Émet le signal vers l'extérieur
+        self.accept()  # Ferme la popup
+    
+    def on_device_connected(self):
+        """Appelé quand l'appareil est branché."""
+        self.device_connected.emit()  # Émet le signal vers l'extérieur
+        self.accept()  # Ferme la popup
 
     def setup_ui(self):
         """Configure the user interface."""
@@ -192,6 +259,13 @@ class InformationPopup(QDialog):
 
                 """
             )
+
+    def closeEvent(self, event):
+        """Nettoie le thread avant de fermer."""
+        if self.monitor_thread and self.monitor_thread.isRunning():
+            self.monitor_thread.stop()
+            self.monitor_thread.wait()
+        event.accept()
 
 
 if __name__ == "__main__":

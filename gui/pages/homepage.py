@@ -27,11 +27,13 @@ from PyQt6.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QFontDatabase
 from typing import Optional
 from gui.i18n import t
 from gui.popup import *
+from gui.popup.information_plug_phone import InformationPopup
 from core.utils import adb_runner
 import os
 
 from gui.popup.about import AboutDialog
 from gui.pages.record_page import RecordDialog
+from gui.popup.information_plug_phone import InformationPopup
 
 
 class CollapsibleBox(QWidget):
@@ -518,7 +520,25 @@ class MainDialog(QDialog):
 
     def show_record_page(self):
         """Show the recording page."""
-        record_dialog = RecordDialog(self, dark_theme=self.dark_theme, language=self.language)
+        # D'abord afficher la popup pour débrancher l'appareil
+        popup = InformationPopup(
+            parent=self,
+            plugged=True,
+            dark_theme=self.dark_theme,
+            language=self.language
+        )
+        popup.device_disconnected.connect(self.start_recording)
+        popup.exec()
+
+    def start_recording(self):
+        """Démarre l'enregistrement après déconnexion de l'appareil."""
+        # Maintenant ouvrir la page d'enregistrement avec le timer démarré
+        record_dialog = RecordDialog(
+            self, 
+            dark_theme=self.dark_theme, 
+            language=self.language,
+            auto_start=True  # Démarre automatiquement le timer
+        )
         record_dialog.recording_finished.connect(self.on_recording_finished)
         record_dialog.exec()
 
