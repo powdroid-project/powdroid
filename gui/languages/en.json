@@ -24,5 +24,13 @@
         "title": "INFORMATION",
         "plug": "Please <b style='color: #57C18B;'>PLUG</b> your device to complete the recording.",
         "unplug": "You can <b style='color: #57C18B;'>UNPLUG</b> your device to start the recording."
+    },
+    "homepage": {
+        "phone_status": {
+            "connected": "Connected device",
+            "disconnected": "No device detected"
+        },
+        "record_button": "START RECORDING"
     }
+
 }
