@@ -39,7 +39,7 @@ from gui.popup.information_plug_phone import InformationPopup
 class CollapsibleBox(QWidget):
     def __init__(self, title="", parent=None, content_size=None):
         super(CollapsibleBox, self).__init__(parent)
-        
+
         self.content_size = content_size  # Store the desired content size
 
         self.toggle_button = QToolButton(text=title, checkable=True, checked=False)
@@ -51,7 +51,6 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.toggle_button.setMinimumSize(QSize(499, 30))
         self.toggle_button.clicked.connect(self.on_clicked)
-        
 
         self.content_area = QScrollArea(maximumHeight=0, minimumHeight=0)
         self.content_area.setSizePolicy(
@@ -75,10 +74,14 @@ class CollapsibleBox(QWidget):
         if checked:
             # Show content with specific size if provided
             if self.content_size:
-                self.content_area.setFixedSize(self.content_size[0], self.content_size[1])
+                self.content_area.setFixedSize(
+                    self.content_size[0], self.content_size[1]
+                )
                 self.content_area.setMaximumHeight(self.content_size[1])
             else:
-                self.content_area.setMaximumHeight(16777215)  # Large value to allow expansion
+                self.content_area.setMaximumHeight(
+                    16777215
+                )  # Large value to allow expansion
         else:
             # Hide content
             self.content_area.setMaximumHeight(0)
@@ -113,7 +116,7 @@ class MainDialog(QDialog):
         self.setFixedSize(550, 900)
 
         self.previous_device_status = None
-        
+
         # Variables pour le déplacement de la fenêtre
         self.dragging = False
         self.drag_position = None
@@ -131,7 +134,9 @@ class MainDialog(QDialog):
         """Handle mouse press for window dragging."""
         if event.button() == Qt.MouseButton.LeftButton:
             self.dragging = True
-            self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            self.drag_position = (
+                event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            )
             event.accept()
 
     def mouseMoveEvent(self, event):
@@ -342,7 +347,9 @@ class MainDialog(QDialog):
         record_button.clicked.connect(self.show_record_page)
 
         instructions_group = CollapsibleBox("Instructions", content_size=(499, 216))
-        instructions_group.toggle_button.setFont(QFont(self.font_family, 24, QFont.Weight.DemiBold))
+        instructions_group.toggle_button.setFont(
+            QFont(self.font_family, 24, QFont.Weight.DemiBold)
+        )
 
         instructions_content_layout = QVBoxLayout()
         instructions_label = QLabel(t("homepage.instructions.content"))
@@ -521,23 +528,26 @@ class MainDialog(QDialog):
     def show_record_page(self):
         """Show the recording page."""
         # D'abord afficher la popup pour débrancher l'appareil
+        adb_runner.kill_all()
+        adb_runner.clear_batterystats(verbose=True)
         popup = InformationPopup(
             parent=self,
             plugged=True,
             dark_theme=self.dark_theme,
-            language=self.language
+            language=self.language,
         )
         popup.device_disconnected.connect(self.start_recording)
         popup.exec()
 
     def start_recording(self):
         """Démarre l'enregistrement après déconnexion de l'appareil."""
+
         # Maintenant ouvrir la page d'enregistrement avec le timer démarré
         record_dialog = RecordDialog(
-            self, 
-            dark_theme=self.dark_theme, 
+            self,
+            dark_theme=self.dark_theme,
             language=self.language,
-            auto_start=True  # Démarre automatiquement le timer
+            auto_start=True,  # Démarre automatiquement le timer
         )
         record_dialog.recording_finished.connect(self.on_recording_finished)
         record_dialog.exec()

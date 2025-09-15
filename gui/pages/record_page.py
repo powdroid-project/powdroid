@@ -2,6 +2,7 @@
 Module for the Record page GUI of PowDroid.
 """
 
+from datetime import datetime
 import os
 from PyQt6.QtWidgets import (
     QDialog,
@@ -14,11 +15,48 @@ from PyQt6.QtWidgets import (
     QWidget,
     QFrame,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize
-from PyQt6.QtGui import QFont, QPixmap, QIcon, QFontDatabase
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize, QThread
+from PyQt6.QtGui import QFont, QPixmap, QIcon, QFontDatabase, QMovie
 from typing import Optional
 from gui.i18n import t
 from gui.popup.about import AboutDialog
+from core.utils import adb_runner, csv_handler
+
+
+class DataProcessingWorker(QThread):
+    """Worker thread for processing recording data."""
+
+    finished = pyqtSignal()
+    error = pyqtSignal(str)
+
+    def __init__(self, start_time, stop_time):
+        super().__init__()
+        self.start_time = start_time
+        self.stop_time = stop_time
+
+    def run(self):
+        """Process the recording data in a separate thread."""
+        try:
+            print("[PowDroid] Starting data processing in worker thread")
+
+            # Dump battery stats
+            adb_runner.dump_batterystats(True)
+
+            # Process CSV file
+            def to_timestamp_ms(dt):
+                return int(dt.timestamp() * 1000) if isinstance(dt, datetime) else dt
+
+            start_ts = to_timestamp_ms(self.start_time)
+            stop_ts = to_timestamp_ms(self.stop_time)
+
+            csv_handler.process_csv_file(start_ts, stop_ts)
+
+            print("[PowDroid] Data processing completed")
+            self.finished.emit()
+
+        except Exception as e:
+            print(f"[PowDroid] Error during data processing: {str(e)}")
+            self.error.emit(str(e))
 
 
 class RecordDialog(QDialog):
@@ -30,7 +68,11 @@ class RecordDialog(QDialog):
     recording_finished = pyqtSignal()
 
     def __init__(
-        self, parent: Optional[QWidget] = None, dark_theme="dark", language="en", auto_start=False
+        self,
+        parent: Optional[QWidget] = None,
+        dark_theme="dark",
+        language="en",
+        auto_start=False,
     ):
         super().__init__(parent)
         self.dark_theme = dark_theme
@@ -48,6 +90,8 @@ class RecordDialog(QDialog):
         self.recording_timer.timeout.connect(self.update_duration)
         self.recording_seconds = 0
         self.is_recording = False
+        self.t_start_time = None
+        self.t_stop_time = None
 
         self.load_fonts()
 
@@ -56,12 +100,12 @@ class RecordDialog(QDialog):
 
         self.setup_ui()
         self.setup_styles()
-        
+
         # Démarrer automatiquement l'enregistrement si demandé
         if self.auto_start:
             self.start_recording_timer()
 
-    # Ajouter ces méthodes pour gérer le déplacement :
+    # Ajouter ces méthodes pour gérer le déplacement de la fenêtre
     def mousePressEvent(self, event):
         """Handle mouse press for window dragging."""
         if event.button() == Qt.MouseButton.LeftButton:
@@ -84,23 +128,23 @@ class RecordDialog(QDialog):
             event.accept()
 
     def start_recording_timer(self):
-        """Démarre le timer d'enregistrement."""
+        """Start the recording timer."""
         if not self.is_recording:
             self.is_recording = True
-            self.recording_timer.start(1000)  # Update every second
-            print("[PowDroid] Timer d'enregistrement démarré")
+            self.t_start_time = datetime.now()
+            self.recording_timer.start(1000)
 
     def stop_recording_timer(self):
-        """Arrête le timer d'enregistrement."""
+        """Stop the recording timer."""
         if self.is_recording:
             self.is_recording = False
+            self.t_stop_time = datetime.now()
             self.recording_timer.stop()
-            print(f"[PowDroid] Enregistrement terminé: {self.format_duration(self.recording_seconds)}")
 
     def update_duration(self):
         """Met à jour l'affichage de la durée d'enregistrement."""
         self.recording_seconds += 1
-        if hasattr(self, 'duration_label'):
+        if hasattr(self, "duration_label"):
             self.duration_label.setText(self.format_duration(self.recording_seconds))
 
     def format_duration(self, seconds):
@@ -111,25 +155,135 @@ class RecordDialog(QDialog):
         return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
     def stop_recording_and_close(self):
-        """Arrête l'enregistrement et demande de rebrancher le téléphone."""
+        """Stop recording and ask to reconnect the phone."""
         self.stop_recording_timer()
-        
-        # Afficher la popup pour rebrancher le téléphone
+
+        self._device_reconnected = False
+
         from gui.popup.information_plug_phone import InformationPopup
-        popup = InformationPopup(
+
+        self.popup = InformationPopup(
             parent=self,
-            plugged=False,  # Demande de brancher le téléphone
+            plugged=False,
             dark_theme=self.dark_theme,
-            language=self.language
+            language=self.language,
         )
-        popup.device_connected.connect(self.on_device_reconnected)  # Utiliser device_connected
-        popup.exec()
+        self.popup.setModal(True)
+        self.popup.device_connected.connect(self.on_device_reconnected)
+
+        result = self.popup.exec()
+
+        if not self._device_reconnected:
+            self._process_recording_data()
 
     def on_device_reconnected(self):
-        """Appelé quand l'appareil est rebranché - termine l'enregistrement."""
-        print("[PowDroid] Téléphone rebranché, enregistrement terminé")
+        """Called when device is reconnected - close popup and process data."""
+        self._device_reconnected = True
+
+        from PyQt6.QtCore import QTimer
+
+        QTimer.singleShot(0, self._close_popup_and_process)
+
+    def _close_popup_and_process(self):
+        """Close popup and process data in main thread."""
+        if hasattr(self, "popup") and self.popup:
+            self.popup.accept()
+
+        self._process_recording_data()
+
+    def _process_recording_data(self):
+        """Process recording data after popup closure."""
+        if self.t_start_time is None or self.t_stop_time is None:
+            if self.t_start_time is None:
+                self.t_start_time = datetime.now()
+            if self.t_stop_time is None:
+                self.t_stop_time = datetime.now()
+
+        self._update_ui_for_data_collection()
+
+        from PyQt6.QtCore import QCoreApplication
+
+        QCoreApplication.processEvents()
+
+        self.worker = DataProcessingWorker(self.t_start_time, self.t_stop_time)
+        self.worker.finished.connect(self._on_data_processing_finished)
+        self.worker.error.connect(self._on_data_processing_error)
+        self.worker.start()
+
+    def _on_data_processing_finished(self):
+        """Called when data processing is finished."""
+        if hasattr(self, "loading_label"):
+            self.loading_label.hide()
+
+        if hasattr(self, "loading_movie") and self.loading_movie:
+            self.loading_movie.stop()
+
         self.recording_finished.emit()
-        # Ne pas fermer la fenêtre - l'utilisateur peut voir la durée finale
+
+        self.worker.deleteLater()
+        self.worker = None
+
+    def _on_data_processing_error(self, error_message):
+        """Called when there's an error during data processing."""
+        if hasattr(self, "loading_label"):
+            self.loading_label.hide()
+
+        if hasattr(self, "loading_movie") and self.loading_movie:
+            self.loading_movie.stop()
+
+        self.recording_finished.emit()
+
+        if hasattr(self, "worker") and self.worker:
+            self.worker.deleteLater()
+            self.worker = None
+
+    def _update_ui_for_data_collection(self):
+        """Update UI to show data collection state."""
+        if hasattr(self, "title_label"):
+            self.title_label.setText("COLLECTING DATA")
+
+        if hasattr(self, "stop_button"):
+            self.stop_button.hide()
+
+        self._create_loading_spinner()
+
+        content_layout = self.main_frame.layout()
+
+        spinner_added = False
+        for i in range(content_layout.count()):
+            widget = content_layout.itemAt(i).widget()
+            if widget == self.duration_label:
+                content_layout.insertWidget(i + 1, self.loading_label)
+                spinner_added = True
+                break
+
+        if not spinner_added:
+            content_layout.addWidget(self.loading_label)
+
+        self.update()
+        self.repaint()
+
+    def _create_loading_spinner(self):
+        """Create loading spinner widget using the loading.gif resource."""
+        self.loading_label = QLabel()
+
+        gif_path = "gui/ressources/loading.gif"
+        if not os.path.exists(gif_path):
+            self.loading_label.setText("● ● ●")
+            self.loading_label.setStyleSheet("font-size: 24px; color: #5374C9;")
+        else:
+            self.loading_movie = QMovie(gif_path)
+
+            if self.loading_movie.isValid():
+                self.loading_movie.setScaledSize(QSize(190, 190))
+                self.loading_label.setMovie(self.loading_movie)
+                self.loading_movie.start()
+            else:
+                self.loading_label.setText("Loading...")
+                self.loading_label.setStyleSheet("font-size: 18px; color: #5374C9;")
+
+        self.loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.loading_label.show()
 
     def load_fonts(self):
         """Loads custom fonts from the fonts folder."""
@@ -170,7 +324,7 @@ class RecordDialog(QDialog):
         content_layout.setSpacing(10)
         content_layout.setContentsMargins(20, 20, 20, 20)
 
-        # Header avec boutons theme et close (identique à homepage)
+        # Header buttons
         header_buttons_layout = QHBoxLayout()
         header_buttons_layout.setSpacing(10)
         header_buttons_layout.setContentsMargins(0, 0, 0, 0)
@@ -224,7 +378,7 @@ class RecordDialog(QDialog):
         header_buttons_layout.addWidget(self.theme_button)
         header_buttons_layout.addWidget(close_button)
 
-        # Logo (identique à homepage)
+        # Logo
         logo_label = QLabel()
         logo_label.setPixmap(
             QPixmap("gui/ressources/PowDroid_Vertical.png").scaled(
@@ -242,7 +396,7 @@ class RecordDialog(QDialog):
         content_layout.addLayout(header_buttons_layout)
         content_layout.addLayout(logo_layout)
 
-        # Header with the title of the window inside a square box (Not USED)
+        # Header with title (Not USED)
         self.title_label = QLabel(t("record.title", language=self.language))
         title_font = QFont(self.font_family, 24, QFont.Weight.DemiBold)
         self.title_label.setFont(title_font)
@@ -269,32 +423,33 @@ class RecordDialog(QDialog):
         # Duration label
         self.duration_label = QLabel("00:00:00")
         self.duration_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        duration_font = QFont(self.font_family, 48, QFont.Weight.Bold)
+        self.duration_label.setFont(duration_font)
         if self.dark_theme == "dark":
             self.duration_label.setStyleSheet("color: #FFFFFF; margin: 20px 0;")
         else:
             self.duration_label.setStyleSheet("color: #000000; margin: 20px 0;")
 
         # Stop button
-        stop_button = QPushButton("STOP RECORDING")
-        stop_button.setIcon(QIcon("gui/ressources/stop.png"))
-        stop_button.setIconSize(QSize(60, 60))
+        self.stop_button = QPushButton("STOP RECORDING")
+        self.stop_button.setIcon(QIcon("gui/ressources/stop.png"))
+        self.stop_button.setIconSize(QSize(60, 60))
         if self.dark_theme == "dark":
-            stop_button.setStyleSheet(
+            self.stop_button.setStyleSheet(
                 "QPushButton { color: #D2D2D2; background-color: #5374C9; border: 1px solid #3C3C3C; border-radius: 5px; text-align: center; padding: 0px; } QPushButton:hover { background-color: #3C3C3C; }"
             )
         else:
-            stop_button.setStyleSheet(
+            self.stop_button.setStyleSheet(
                 "QPushButton { color: #000000; background-color: #5374C9; border: 1px solid #D9D9D9; border-radius: 5px; text-align: center; padding: 0px; } QPushButton:hover { background-color: #E0E0E0; }"
             )
-        stop_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.stop_button.setCursor(Qt.CursorShape.PointingHandCursor)
         github_font = QFont(self.font_family, 24, QFont.Weight.DemiBold)
-        stop_button.setFont(github_font)
-        stop_button.setFixedSize(499, 100)
-        
-        # Connecter le bouton stop à la méthode d'arrêt
-        stop_button.clicked.connect(self.stop_recording_and_close)
+        self.stop_button.setFont(github_font)
+        self.stop_button.setFixedSize(499, 100)
 
-        # Bouton d'aide (identique à homepage)
+        self.stop_button.clicked.connect(self.stop_recording_and_close)
+
+        # Help button
         question_label = QLabel("?")
         question_label.setFont(QFont(self.font_family, 32, QFont.Weight.Bold))
         question_label.setToolTip("About PowDroid")
@@ -306,9 +461,15 @@ class RecordDialog(QDialog):
         question_label.setCursor(Qt.CursorShape.PointingHandCursor)
         question_label.mousePressEvent = lambda _: self.show_about_page()
 
-        content_layout.addWidget(self.title_frame, alignment=Qt.AlignmentFlag.AlignCenter)
-        content_layout.addWidget(self.duration_label, alignment=Qt.AlignmentFlag.AlignCenter)
-        content_layout.addWidget(stop_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        content_layout.addWidget(
+            self.title_frame, alignment=Qt.AlignmentFlag.AlignCenter
+        )
+        content_layout.addWidget(
+            self.duration_label, alignment=Qt.AlignmentFlag.AlignCenter
+        )
+        content_layout.addWidget(
+            self.stop_button, alignment=Qt.AlignmentFlag.AlignCenter
+        )
 
         content_layout.addWidget(
             question_label,
@@ -325,7 +486,6 @@ class RecordDialog(QDialog):
 
         self.setup_styles()
 
-        # Mettre à jour l'icône de fermeture
         if self.dark_theme == "dark":
             close_icon_path = "gui/ressources/close_white.png"
         else:
