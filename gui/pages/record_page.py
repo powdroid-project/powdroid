@@ -18,6 +18,7 @@ from PyQt6.QtGui import QFont, QPixmap, QIcon, QFontDatabase, QMovie
 from typing import Optional
 from gui.i18n import t
 from gui.popup.about import AboutDialog
+from gui.pages.battery_report import BatteryReportDialog
 from core.utils import adb_runner, csv_handler
 
 
@@ -26,6 +27,7 @@ class DataProcessingWorker(QThread):
 
     finished = pyqtSignal()
     error = pyqtSignal(str)
+    csv_generated = pyqtSignal(str)  # Signal to emit CSV file path
 
     def __init__(self, start_time, stop_time):
         super().__init__()
@@ -52,9 +54,11 @@ class DataProcessingWorker(QThread):
             start_ts = to_timestamp_ms(self.start_time)
             stop_ts = to_timestamp_ms(self.stop_time)
 
-            csv_handler.process_csv_file(start_ts, stop_ts)
+            csv_file_path = csv_handler.process_csv_file(start_ts, stop_ts)
 
             print("[PowDroid] Data processing completed")
+            if csv_file_path:
+                self.csv_generated.emit(csv_file_path)
             self.finished.emit()
 
         except Exception as e:
@@ -206,6 +210,7 @@ class RecordDialog(QDialog):
         self.worker = DataProcessingWorker(self.t_start_time, self.t_stop_time)
         self.worker.finished.connect(self._on_data_processing_finished)
         self.worker.error.connect(self._on_data_processing_error)
+        self.worker.csv_generated.connect(self._on_csv_generated)
         self.worker.start()
 
     def _on_data_processing_finished(self):
@@ -234,6 +239,20 @@ class RecordDialog(QDialog):
         if hasattr(self, "worker") and self.worker:
             self.worker.deleteLater()
             self.worker = None
+
+    def _on_csv_generated(self, csv_file_path):
+        """Called when CSV file is generated - opens battery report."""
+        try:
+            # Open the battery report dialog
+            battery_report = BatteryReportDialog(
+                csv_file_path=csv_file_path,
+                parent=self,
+                dark_theme=self.dark_theme,
+                language=self.language,
+            )
+            battery_report.exec()
+        except Exception as e:
+            print(f"[PowDroid] Error opening battery report: {str(e)}")
 
     def _update_ui_for_data_collection(self):
         """Update UI to show data collection state."""
