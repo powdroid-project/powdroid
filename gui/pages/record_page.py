@@ -264,25 +264,48 @@ class RecordDialog(QDialog):
         self.repaint()
 
     def _create_loading_spinner(self):
-        """Create loading spinner widget using the loading.gif resource."""
-        self.loading_label = QLabel()
+        """Create loading spinner widget with message using the loading.gif resource."""
+        # Create container widget for spinner and message
+        self.loading_label = QWidget()
+        loading_layout = QVBoxLayout()
+        loading_layout.setSpacing(10)
+        loading_layout.setContentsMargins(0, 0, 0, 0)
 
+        # Create spinner label
+        spinner_label = QLabel()
         gif_path = "gui/ressources/loading.gif"
         if not os.path.exists(gif_path):
-            self.loading_label.setText("● ● ●")
-            self.loading_label.setStyleSheet("font-size: 24px; color: #5374C9;")
+            spinner_label.setText("● ● ●")
+            spinner_label.setStyleSheet("font-size: 24px; color: #5374C9;")
         else:
             self.loading_movie = QMovie(gif_path)
 
             if self.loading_movie.isValid():
                 self.loading_movie.setScaledSize(QSize(190, 190))
-                self.loading_label.setMovie(self.loading_movie)
+                spinner_label.setMovie(self.loading_movie)
                 self.loading_movie.start()
             else:
-                self.loading_label.setText("Loading...")
-                self.loading_label.setStyleSheet("font-size: 18px; color: #5374C9;")
+                spinner_label.setText("Loading...")
+                spinner_label.setStyleSheet("font-size: 18px; color: #5374C9;")
 
-        self.loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        spinner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # Create message label
+        message_label = QLabel("Please wait. It may take a while.")
+        message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        message_font = QFont(self.font_family, 32, QFont.Weight.DemiBold)
+        message_font.setItalic(True)
+        message_label.setFont(message_font)
+        if self.dark_theme == "dark":
+            message_label.setStyleSheet("color: #D2D2D2; margin: 10px 0;")
+        else:
+            message_label.setStyleSheet("color: #666666; margin: 10px 0;")
+
+        # Add widgets to layout
+        loading_layout.addWidget(spinner_label, alignment=Qt.AlignmentFlag.AlignCenter)
+        loading_layout.addWidget(message_label, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        self.loading_label.setLayout(loading_layout)
         self.loading_label.show()
 
     def load_fonts(self):
