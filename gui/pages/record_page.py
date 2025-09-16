@@ -243,16 +243,51 @@ class RecordDialog(QDialog):
     def _on_csv_generated(self, csv_file_path):
         """Called when CSV file is generated - opens battery report."""
         try:
-            # Open the battery report dialog
-            battery_report = BatteryReportDialog(
-                csv_file_path=csv_file_path,
-                parent=self,
-                dark_theme=self.dark_theme,
-                language=self.language,
-            )
-            battery_report.exec()
+            # Store reference to parent (homepage) to restore it later
+            homepage_parent = self.parent()
+            
+            # Mark homepage to not restore itself automatically
+            if homepage_parent:
+                homepage_parent.should_restore_on_recording_finished = False
+            
+            # Import here to avoid circular imports
+            from gui.pages.battery_report import BatteryReportDialog
+            
+            # Create and show battery report independently
+            def show_battery_report():
+                battery_report = BatteryReportDialog(
+                    csv_file_path=csv_file_path,
+                    parent=None,  # No parent since we're managing windows independently
+                    dark_theme=self.dark_theme,
+                    language=self.language,
+                )
+                
+                # Store homepage reference to restore it later (don't create new one)
+                battery_report.homepage_to_restore = homepage_parent
+                
+                # Set it to foreground mode (interactive, modal)
+                battery_report.set_background_mode(False)
+                
+                # Show battery report modally
+                battery_report.exec()
+            
+            # Close the record page first
+            self.accept()
+            
+            # Use QTimer to show battery report after record page closes
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(100, show_battery_report)
+            
         except Exception as e:
             print(f"[PowDroid] Error opening battery report: {str(e)}")
+    
+    def _on_battery_report_closed(self, result):
+        """Called when battery report is closed - clean up only since record page is already closed."""
+        # The record page is already closed at this point since we call self.accept() 
+        # in _on_csv_generated, so this method just cleans up the battery report
+        if hasattr(self, 'battery_report'):
+            self.battery_report.deleteLater()
+            self.battery_report = None
 
     def _update_ui_for_data_collection(self):
         """Update UI to show data collection state."""
@@ -261,6 +296,9 @@ class RecordDialog(QDialog):
 
         if hasattr(self, "stop_button"):
             self.stop_button.hide()
+
+        if hasattr(self, "duration_label"):
+            self.duration_label.hide()
 
         self._create_loading_spinner()
 

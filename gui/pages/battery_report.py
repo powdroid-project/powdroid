@@ -25,7 +25,7 @@ from PyQt6.QtGui import QFont, QPixmap, QIcon, QFontDatabase
 from typing import Optional
 import matplotlib
 
-matplotlib.use("Qt5Agg")  # Use Qt5Agg backend for PyQt6 compatibility
+matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -48,29 +48,22 @@ class BatteryReportCanvas(FigureCanvas):
         )
         FigureCanvas.updateGeometry(self)
 
-        # Set dark theme for matplotlib
         plt.style.use("dark_background")
         self.figure.patch.set_facecolor("#2b2b2b")
 
     def plot_battery_data(self, csv_file_path):
         """Plot cumulative energy data from CSV file"""
         try:
-            # Read CSV data
             df = pd.read_csv(csv_file_path)
 
-            # Convert timestamps to datetime
             df["start_datetime"] = pd.to_datetime(df["start_time"], unit="ms")
 
-            # Calculate cumulative energy
             df["Cumulative_Energy"] = df["Energy (J)"].cumsum()
 
-            # Clear previous plots
             self.figure.clear()
 
-            # Create single plot for cumulative energy
             ax = self.figure.add_subplot(111)
 
-            # Plot cumulative energy
             ax.plot(
                 df["start_datetime"],
                 df["Cumulative_Energy"],
@@ -80,7 +73,6 @@ class BatteryReportCanvas(FigureCanvas):
                 markersize=1,
             )
 
-            # Styling for dark theme
             ax.set_title(
                 "Cumulative Energy Consumption", fontsize=16, color="white", pad=20
             )
@@ -89,22 +81,17 @@ class BatteryReportCanvas(FigureCanvas):
             ax.grid(True, alpha=0.3, color="white")
             ax.tick_params(colors="white")
 
-            # Format x-axis
             ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
             ax.tick_params(axis="x", rotation=45)
 
-            # Set background color
             ax.set_facecolor("#2b2b2b")
 
-            # Adjust layout
             self.figure.tight_layout()
 
-            # Refresh canvas
             self.draw()
 
         except Exception as e:
             print(f"Error plotting battery data: {e}")
-            # Show error on canvas
             self.figure.clear()
             ax = self.figure.add_subplot(111)
             ax.text(
@@ -221,7 +208,6 @@ class BatteryReportDialog(QDialog):
 
         self.setup_styles()
 
-        # Update close button icon
         if self.dark_theme == "dark":
             close_icon_path = "gui/ressources/close_white.png"
         else:
@@ -240,14 +226,12 @@ class BatteryReportDialog(QDialog):
                 )
             )
 
-        # Update title label style
         if hasattr(self, "title_label"):
             if self.dark_theme == "dark":
                 self.title_label.setStyleSheet("color: #D2D2D2;")
             else:
                 self.title_label.setStyleSheet("color: #000000;")
 
-        # Update title frame style
         if hasattr(self, "title_frame"):
             if self.dark_theme == "dark":
                 self.title_frame.setStyleSheet(
@@ -258,7 +242,6 @@ class BatteryReportDialog(QDialog):
                     "background-color: #EEEEEE; border: 1px solid #D9D9D9; border-radius: 8px;"
                 )
 
-        # Update chart frame style
         content_layout = self.main_frame.layout()
         for i in range(content_layout.count()):
             widget = content_layout.itemAt(i).widget()
@@ -273,7 +256,6 @@ class BatteryReportDialog(QDialog):
                     )
                 break
 
-        # Update question mark style
         for i in range(content_layout.count()):
             widget = content_layout.itemAt(i).widget()
             if isinstance(widget, QLabel) and widget.text() == "?":
@@ -283,11 +265,8 @@ class BatteryReportDialog(QDialog):
                     widget.setStyleSheet("color: #313131;")
                 break
 
-        # Update matplotlib canvas background
         if hasattr(self, "canvas"):
-            self.canvas.figure.patch.set_facecolor(
-                "#2b2b2b" if self.dark_theme == "dark" else "white"
-            )
+            self.canvas.figure.patch.set_facecolor("#2b2b2b")
             self.canvas.draw()
 
     def setup_ui(self):
@@ -301,7 +280,6 @@ class BatteryReportDialog(QDialog):
         content_layout.setSpacing(10)
         content_layout.setContentsMargins(20, 20, 20, 20)
 
-        # Header with theme toggle and close button - matching record page style
         header_buttons_layout = QHBoxLayout()
         header_buttons_layout.setSpacing(10)
         header_buttons_layout.setContentsMargins(0, 0, 0, 0)
@@ -324,7 +302,6 @@ class BatteryReportDialog(QDialog):
 
         self.theme_button.mousePressEvent = toggle_theme
 
-        # Close button
         close_button = QLabel(self)
         if self.dark_theme == "dark":
             close_button.setPixmap(
@@ -358,7 +335,6 @@ class BatteryReportDialog(QDialog):
 
         content_layout.addLayout(header_buttons_layout)
 
-        # Logo - matching homepage style
         logo_label = QLabel()
         logo_label.setPixmap(
             QPixmap("gui/ressources/PowDroid_Vertical.png").scaled(
@@ -375,7 +351,6 @@ class BatteryReportDialog(QDialog):
 
         content_layout.addLayout(logo_layout)
 
-        # Header with title
         self.title_label = QLabel("Battery Usage Report")
         title_font = QFont(self.font_family, 24, QFont.Weight.DemiBold)
         self.title_label.setFont(title_font)
@@ -403,7 +378,6 @@ class BatteryReportDialog(QDialog):
             self.title_frame, alignment=Qt.AlignmentFlag.AlignCenter
         )
 
-        # Chart frame - matching homepage frame style
         chart_frame = QFrame()
         if self.dark_theme == "dark":
             chart_frame.setStyleSheet(
@@ -413,18 +387,16 @@ class BatteryReportDialog(QDialog):
             chart_frame.setStyleSheet(
                 "background-color: #EEEEEE; border: 1px solid #D9D9D9; border-radius: 8px;"
             )
-        chart_frame.setFixedSize(499, 400)  # Adjusted size for smaller window
+        chart_frame.setFixedSize(499, 400)
 
         chart_layout = QVBoxLayout(chart_frame)
         chart_layout.setContentsMargins(15, 15, 15, 15)
 
-        # Add graphs canvas
         self.canvas = BatteryReportCanvas(chart_frame, width=8, height=4, dpi=80)
         chart_layout.addWidget(self.canvas)
 
         content_layout.addWidget(chart_frame)
 
-        # Question mark - matching homepage style
         question_label = QLabel("?")
         question_label.setFont(QFont(self.font_family, 32, QFont.Weight.Bold))
         question_label.setToolTip("About PowDroid")
@@ -450,33 +422,63 @@ class BatteryReportDialog(QDialog):
         if self.dark_theme == "dark":
             self.setStyleSheet(
                 """
-                /* Main dialog style (transparent) */
                 BatteryReportDialog {
                     background-color: transparent;
                 }
                 
-                /* Main frame style with rounded corners */
                 QFrame {
                     border-radius: 5px;
                     background-color: #1D1D1D;
+                    opacity: 0.7;
                 }
                 """
             )
         else:
             self.setStyleSheet(
                 """
-                /* Main dialog style (transparent) */
                 BatteryReportDialog {
                     background-color: transparent;
                 }
                 
-                /* Main frame style with rounded corners */
                 QFrame {
                     border-radius: 5px;
                     background-color: white;
+                    opacity: 0.7;
                 }
                 """
             )
+    
+    def set_background_mode(self, is_background=True):
+        """Set the dialog to background mode (non-interactive) or foreground mode."""
+        if is_background:
+            self.setWindowFlags(
+                Qt.WindowType.Window | 
+                Qt.WindowType.FramelessWindowHint |
+                Qt.WindowType.WindowStaysOnBottomHint
+            )
+            self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+            self.setEnabled(False)
+            self.setWindowOpacity(0.8)
+        else:
+            self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
+            self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, False)
+            self.setEnabled(True)
+            self.setWindowOpacity(1.0)
+
+    def closeEvent(self, event):
+        """Handle close event to restore homepage."""
+        if hasattr(self, 'homepage_to_restore') and self.homepage_to_restore:
+            from PyQt6.QtCore import QTimer
+            
+            def restore_homepage():
+                self.homepage_to_restore.show()
+                self.homepage_to_restore.raise_()
+                self.homepage_to_restore.activateWindow()
+                self.homepage_to_restore.should_restore_on_recording_finished = True
+            
+            QTimer.singleShot(100, restore_homepage)
+        
+        event.accept()
 
     def load_report_data(self, csv_file_path):
         """Load and display battery report data"""
@@ -498,30 +500,13 @@ class BatteryReportDialog(QDialog):
 
 
 def find_latest_csv_file():
-    """Find the latest generated CSV file in the current directory"""
     current_dir = Path.cwd()
     csv_files = list(current_dir.glob("PowDroid_*.csv"))
 
     if not csv_files:
         return None
 
-    # Return the most recent file
     latest_file = max(csv_files, key=os.path.getctime)
     return str(latest_file)
 
 
-if __name__ == "__main__":
-    """Test the battery report dialog"""
-    import sys
-    from PyQt6.QtWidgets import QApplication
-
-    app = QApplication(sys.argv)
-
-    # Find latest CSV file for testing
-    csv_file = find_latest_csv_file()
-    if csv_file:
-        dialog = BatteryReportDialog(csv_file_path=csv_file)
-        dialog.show()
-        sys.exit(app.exec())
-    else:
-        print("No CSV file found for testing")

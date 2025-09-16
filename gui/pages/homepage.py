@@ -325,22 +325,15 @@ class MainDialog(QDialog):
 
         title_frame.setLayout(title_layout)
 
-        record_button = QPushButton(t("homepage.record_button"))
-        record_button.setIcon(QIcon("gui/ressources/record.png"))
-        record_button.setIconSize(QSize(60, 60))
-        if self.dark_theme == "dark":
-            record_button.setStyleSheet(
-                "QPushButton { color: #D2D2D2; background-color: #5374C9; border: 1px solid #3C3C3C; border-radius: 5px; text-align: center; padding: 0px; } QPushButton:hover { background-color: #3C3C3C; }"
-            )
-        else:
-            record_button.setStyleSheet(
-                "QPushButton { color: #000000; background-color: #5374C9; border: 1px solid #D9D9D9; border-radius: 5px; text-align: center; padding: 0px; } QPushButton:hover { background-color: #E0E0E0; }"
-            )
-        record_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.record_button = QPushButton(t("homepage.record_button"))
+        self.record_button.setIcon(QIcon("gui/ressources/record.png"))
+        self.record_button.setIconSize(QSize(60, 60))
+        self.update_record_button_style()
+        self.record_button.setCursor(Qt.CursorShape.PointingHandCursor)
         github_font = QFont(self.font_family, 24, QFont.Weight.DemiBold)
-        record_button.setFont(github_font)
-        record_button.setFixedSize(499, 100)
-        record_button.clicked.connect(self.show_record_page)
+        self.record_button.setFont(github_font)
+        self.record_button.setFixedSize(499, 100)
+        self.record_button.clicked.connect(self.show_record_page)
 
         instructions_group = CollapsibleBox("Instructions", content_size=(499, 216))
         instructions_group.toggle_button.setFont(
@@ -367,7 +360,7 @@ class MainDialog(QDialog):
         question_label.mousePressEvent = lambda _: self.show_about_page()
 
         content_layout.addWidget(title_frame)
-        content_layout.addWidget(record_button)
+        content_layout.addWidget(self.record_button)
         content_layout.addWidget(instructions_group)
         content_layout.addWidget(
             question_label,
@@ -460,6 +453,34 @@ class MainDialog(QDialog):
         ):
             self.update_phone_status(self.previous_device_status)
 
+    def update_record_button_style(self):
+        """Update the record button style based on theme and enabled state."""
+        if not hasattr(self, 'record_button'):
+            return
+            
+        if self.record_button.isEnabled():
+            # Button enabled style
+            if self.dark_theme == "dark":
+                self.record_button.setStyleSheet(
+                    "QPushButton { color: #D2D2D2; background-color: #5374C9; border: 1px solid #3C3C3C; border-radius: 5px; text-align: center; padding: 0px; } QPushButton:hover { background-color: #4A66B8; }"
+                )
+            else:
+                self.record_button.setStyleSheet(
+                    "QPushButton { color: #FFFFFF; background-color: #5374C9; border: 1px solid #D9D9D9; border-radius: 5px; text-align: center; padding: 0px; } QPushButton:hover { background-color: #4A66B8; }"
+                )
+            self.record_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            # Button disabled style
+            if self.dark_theme == "dark":
+                self.record_button.setStyleSheet(
+                    "QPushButton { color: #888888; background-color: #3C3C3C; border: 1px solid #3C3C3C; border-radius: 5px; text-align: center; padding: 0px; }"
+                )
+            else:
+                self.record_button.setStyleSheet(
+                    "QPushButton { color: #888888; background-color: #E0E0E0; border: 1px solid #D9D9D9; border-radius: 5px; text-align: center; padding: 0px; }"
+                )
+            self.record_button.setCursor(Qt.CursorShape.ForbiddenCursor)
+
     def check_device_status(self):
         """Check periodically for device connection status and update UI if necessary."""
         current_status = adb_runner.is_device_connected()
@@ -520,9 +541,19 @@ class MainDialog(QDialog):
             self.phone_image.setFont(icon_font)
 
         self.status_label.setText(status_text)
+        
+        # Enable or disable the record button based on device connection
+        if hasattr(self, 'record_button'):
+            self.record_button.setEnabled(phone_detected)
+            self.update_record_button_style()
 
     def show_record_page(self):
         """Show the recording page."""
+        # Check if device is connected before proceeding
+        if not adb_runner.is_device_connected():
+            print("[PowDroid] Cannot start recording: No device connected")
+            return
+            
         adb_runner.kill_all()
         adb_runner.clear_batterystats(verbose=True)
         self.popup = InformationPopup(
@@ -561,9 +592,26 @@ class MainDialog(QDialog):
 
     def on_recording_finished(self):
         """Handle when recording is finished."""
-        # Show the homepage again after recording is finished
+        # Check if this homepage window is still the active one and should be shown
+        # If battery report is handling homepage restoration, don't interfere
+        try:
+            if hasattr(self, 'should_restore_on_recording_finished') and not self.should_restore_on_recording_finished:
+                return
+                
+            # Show the homepage again after recording is finished
+            self.show()
+            # Ensure homepage stays on top
+            self.raise_()
+            self.activateWindow()
+        except RuntimeError:
+            # Homepage object may have been destroyed, ignore
+            pass
+
+    def bring_to_front(self):
+        """Bring the homepage to the front of all windows."""
         self.show()
-        pass
+        self.raise_()
+        self.activateWindow()
 
     def setup_styles(self):
         """Configure CSS styles for the main dialog."""
