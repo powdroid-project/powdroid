@@ -447,37 +447,39 @@ class BatteryReportDialog(QDialog):
                 }
                 """
             )
-    
+
     def set_background_mode(self, is_background=True):
         """Set the dialog to background mode (non-interactive) or foreground mode."""
         if is_background:
             self.setWindowFlags(
-                Qt.WindowType.Window | 
-                Qt.WindowType.FramelessWindowHint |
-                Qt.WindowType.WindowStaysOnBottomHint
+                Qt.WindowType.Window
+                | Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.WindowStaysOnBottomHint
             )
             self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
             self.setEnabled(False)
             self.setWindowOpacity(0.8)
         else:
-            self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
+            self.setWindowFlags(
+                Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint
+            )
             self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, False)
             self.setEnabled(True)
             self.setWindowOpacity(1.0)
 
     def closeEvent(self, event):
         """Handle close event to restore homepage."""
-        if hasattr(self, 'homepage_to_restore') and self.homepage_to_restore:
+        if hasattr(self, "homepage_to_restore") and self.homepage_to_restore:
             from PyQt6.QtCore import QTimer
-            
+
             def restore_homepage():
                 self.homepage_to_restore.show()
                 self.homepage_to_restore.raise_()
                 self.homepage_to_restore.activateWindow()
                 self.homepage_to_restore.should_restore_on_recording_finished = True
-            
+
             QTimer.singleShot(100, restore_homepage)
-        
+
         event.accept()
 
     def load_report_data(self, csv_file_path):
@@ -508,5 +510,3 @@ def find_latest_csv_file():
 
     latest_file = max(csv_files, key=os.path.getctime)
     return str(latest_file)
-
-

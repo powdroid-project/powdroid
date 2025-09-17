@@ -33,7 +33,7 @@
         "record_button": "START RECORDING",
         "instructions": {
             "title": "Instructions",
-            "content": "Connect your Android smartphone via USB\nEnable USB debugging in developer options\nClick 'START RECORDING' to start monitoring\nFollow the on-screen instructions."
+            "content": "1. Connect your Android smartphone via USB<br><br>2. Enable USB debugging in developer options<br><br>3. Click 'START RECORDING' to start monitoring<br><br>4. Follow the on-screen instructions."
         }
     },
     "record": {

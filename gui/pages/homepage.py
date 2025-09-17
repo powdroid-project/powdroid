@@ -2,7 +2,6 @@
 Module for the "Main" GUI of PowDroid.
 """
 
-import os
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -34,33 +33,46 @@ from gui.pages.record_page import RecordDialog
 from gui.popup.information_plug_phone import InformationPopup
 
 
-class CollapsibleBox(QWidget):
+class CollapsibleBox(QFrame):
     def __init__(self, title="", parent=None, content_size=None):
         super(CollapsibleBox, self).__init__(parent)
 
-        self.content_size = content_size  # Store the desired content size
+        self.content_size = content_size
+
+        self.setObjectName("collapsible_box")
+        self.setFixedWidth(499)
+        self.setFixedHeight(350)
 
         self.toggle_button = QToolButton(text=title, checkable=True, checked=False)
-        self.toggle_button.setStyleSheet("QToolButton { border: none; }")
         self.toggle_button.setToolButtonStyle(
             Qt.ToolButtonStyle.ToolButtonTextBesideIcon
         )
         self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
         self.toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.toggle_button.setMinimumSize(QSize(499, 30))
+        self.toggle_button.setFixedSize(489, 40)
         self.toggle_button.clicked.connect(self.on_clicked)
 
-        self.content_area = QScrollArea(maximumHeight=0, minimumHeight=0)
-        self.content_area.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-        )
+        self.content_area = QScrollArea()
+        self.content_area.setObjectName("collapsible_content_area")
         self.content_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.content_area.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.content_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.content_area.setWidgetResizable(True)
 
-        lay = QVBoxLayout(self)
-        lay.setSpacing(0)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(self.toggle_button)
-        lay.addWidget(self.content_area)
+        self.toggle_button.setParent(self)
+        self.toggle_button.move(5, 5)
+
+        self.content_area.setParent(self)
+        self.content_area.move(5, 50)
+        self.content_area.resize(489, 0)
+
+        self.content_widget = QWidget()
+        self.content_widget.setObjectName("collapsible_content_widget")
+        self.content_area.setWidget(self.content_widget)
 
     @pyqtSlot()
     def on_clicked(self):
@@ -68,29 +80,28 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setArrowType(
             Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow
         )
-        # Toggle the content area visibility directly without animation
+
         if checked:
-            # Show content with specific size if provided
-            if self.content_size:
-                self.content_area.setFixedSize(
-                    self.content_size[0], self.content_size[1]
-                )
-                self.content_area.setMaximumHeight(self.content_size[1])
-            else:
-                self.content_area.setMaximumHeight(
-                    16777215
-                )  # Large value to allow expansion
+            self.content_area.setVisible(True)
+            self.content_area.resize(489, 280)
+            self.content_area.setMinimumHeight(280)
+            self.content_area.setMaximumHeight(280)
         else:
-            # Hide content
-            self.content_area.setMaximumHeight(0)
+            self.content_area.resize(489, 0)
             self.content_area.setMinimumHeight(0)
-            # Reset fixed size to allow proper hiding
-            self.content_area.setFixedSize(0, 0)
+            self.content_area.setMaximumHeight(0)
+            self.content_area.setVisible(False)
 
     def setContentLayout(self, layout):
-        lay = self.content_area.layout()
-        del lay
-        self.content_area.setLayout(layout)
+        if self.content_widget.layout():
+            old_layout = self.content_widget.layout()
+            while old_layout.count():
+                child = old_layout.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
+            old_layout.deleteLater()
+
+        self.content_widget.setLayout(layout)
 
 
 class MainDialog(QDialog):
@@ -187,7 +198,7 @@ class MainDialog(QDialog):
         content_layout.setContentsMargins(20, 20, 20, 20)
 
         header_buttons_layout = QHBoxLayout()
-        header_buttons_layout.setSpacing(10)
+        header_buttons_layout.setSpacing(5)
         header_buttons_layout.setContentsMargins(0, 0, 0, 0)
 
         self.theme_button = QLabel(self)
@@ -342,7 +353,7 @@ class MainDialog(QDialog):
 
         instructions_content_layout = QVBoxLayout()
         instructions_label = QLabel(t("homepage.instructions.content"))
-        instructions_label.setFont(QFont(self.font_family, 16, QFont.Weight.Normal))
+        instructions_label.setFont(QFont(self.font_family, 20, QFont.Weight.Normal))
         instructions_label.setWordWrap(True)
 
         instructions_content_layout.addWidget(instructions_label)
@@ -455,9 +466,9 @@ class MainDialog(QDialog):
 
     def update_record_button_style(self):
         """Update the record button style based on theme and enabled state."""
-        if not hasattr(self, 'record_button'):
+        if not hasattr(self, "record_button"):
             return
-            
+
         if self.record_button.isEnabled():
             # Button enabled style
             if self.dark_theme == "dark":
@@ -541,9 +552,9 @@ class MainDialog(QDialog):
             self.phone_image.setFont(icon_font)
 
         self.status_label.setText(status_text)
-        
+
         # Enable or disable the record button based on device connection
-        if hasattr(self, 'record_button'):
+        if hasattr(self, "record_button"):
             self.record_button.setEnabled(phone_detected)
             self.update_record_button_style()
 
@@ -553,7 +564,7 @@ class MainDialog(QDialog):
         if not adb_runner.is_device_connected():
             print("[PowDroid] Cannot start recording: No device connected")
             return
-            
+
         adb_runner.kill_all()
         adb_runner.clear_batterystats(verbose=True)
         self.popup = InformationPopup(
@@ -595,9 +606,12 @@ class MainDialog(QDialog):
         # Check if this homepage window is still the active one and should be shown
         # If battery report is handling homepage restoration, don't interfere
         try:
-            if hasattr(self, 'should_restore_on_recording_finished') and not self.should_restore_on_recording_finished:
+            if (
+                hasattr(self, "should_restore_on_recording_finished")
+                and not self.should_restore_on_recording_finished
+            ):
                 return
-                
+
             # Show the homepage again after recording is finished
             self.show()
             # Ensure homepage stays on top
@@ -629,17 +643,37 @@ class MainDialog(QDialog):
                     background-color: #1D1D1D ;
                 }
                 
+                /* CollapsibleBox specific styles */
+                QFrame#collapsible_box {
+                    background-color: transparent;
+                    border: none;
+                }
+                
                 /* CollapsibleBox styles */
                 QToolButton {
                     border: none;
                     color: white;
                     text-align: left;
                     padding: 5px;
+                    background-color: transparent;
                 }
                 
-                QScrollArea {
+                QToolButton:hover {
+                    background-color: #3D3D3D;
+                }
+                
+                QScrollArea#collapsible_content_area {
                     border: none;
-                    background-color: transparent;
+                    background-color: #1D1D1D;
+                }
+                
+                QWidget#collapsible_content_widget {
+                    background-color: #1D1D1D;
+                }
+                
+                QLabel {
+                    color: white;
+                    background-color: #1D1D1D;
                 }
             """
             )
@@ -657,17 +691,37 @@ class MainDialog(QDialog):
                     background-color: white;
                 }
                 
+                /* CollapsibleBox specific styles */
+                QFrame#collapsible_box {
+                    background-color: transparent;
+                    border: none;
+                }
+                
                 /* CollapsibleBox styles */
                 QToolButton {
                     border: none;
                     color: black;
                     text-align: left;
                     padding: 5px;
+                    background-color: transparent;
                 }
                 
-                QScrollArea {
+                QToolButton:hover {
+                    background-color: #E0E0E0;
+                }
+                
+                QScrollArea#collapsible_content_area {
                     border: none;
-                    background-color: transparent;
+                    background-color: white;
+                }
+                
+                QWidget#collapsible_content_widget {
+                    background-color: white;
+                }
+                
+                QLabel {
+                    color: black;
+                    background-color: white;
                 }
                 """
             )
