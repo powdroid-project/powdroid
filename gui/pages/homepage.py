@@ -202,14 +202,7 @@ class MainDialog(QDialog):
         header_buttons_layout.setContentsMargins(0, 0, 0, 0)
 
         self.theme_button = QLabel(self)
-        self.theme_button.setPixmap(
-            QPixmap("gui/ressources/dark_light.png").scaled(
-                40,
-                40,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-        )
+        self.update_theme_button_icon()
         self.theme_button.setFixedSize(40, 40)
         self.theme_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.theme_button.setToolTip("Toggle Dark/Light Theme")
@@ -388,11 +381,31 @@ class MainDialog(QDialog):
         main_layout.addWidget(self.main_frame)
         self.setLayout(main_layout)
 
+    def update_theme_button_icon(self):
+        """Update the theme button icon based on the current theme."""
+        if self.dark_theme == "dark":
+            # In dark theme, show light theme icon (suggesting switch to light)
+            icon_path = "gui/ressources/light.png"  # You can replace with a specific light theme icon
+        else:
+            # In light theme, show dark theme icon (suggesting switch to dark)
+            icon_path = "gui/ressources/dark.png"  # You can replace with a specific dark theme icon
+        
+        if os.path.exists(icon_path):
+            self.theme_button.setPixmap(
+                QPixmap(icon_path).scaled(
+                    40,
+                    40,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+
     def toggle_theme(self):
         """Toggle between dark and light theme and update the interface."""
         self.dark_theme = "light" if self.dark_theme == "dark" else "dark"
 
         self.setup_styles()
+        self.update_theme_button_icon()  # Update theme button icon
 
         if self.dark_theme == "dark":
             close_icon_path = "gui/ressources/close_white.png"
