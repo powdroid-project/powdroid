@@ -138,8 +138,10 @@ class CheckConfigDialog(QDialog):
                 t("check_config.pandas_library", language=self.language),
                 check_pandas_module,
             ),
-            (t("check_config.gui_module", language=self.language), check_gui_modules),
-            (t("check_config.go_runtime", language=self.language), check_go_runtime),
+            (
+                t("check_config.go_runtime", language=self.language),
+                check_go_runtime,
+            ),
             (
                 t("check_config.adb_server", language=self.language),
                 initialize_adb_server,

@@ -11,17 +11,54 @@ from PyQt6.QtWidgets import (
     QWidget,
     QPushButton,
 )
-from PyQt6.QtCore import Qt, QSize, QRect, QUrl
+from PyQt6.QtCore import Qt, QSize, QRect, QUrl, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QFontDatabase
 from typing import Optional
 from gui.i18n import t
+from core.utils.adb_runner import wait_for_device_disconnection, is_device_connected
 import os
+
+
+class DeviceMonitorThread(QThread):
+    """Thread to monitor device connection/disconnection."""
+
+    device_disconnected = pyqtSignal()
+    device_connected = pyqtSignal()
+
+    def __init__(self, wait_for_connection=False, verbose=False):
+        super().__init__()
+        self.wait_for_connection = wait_for_connection
+        self.verbose = verbose
+        self.should_stop = False
+
+    def run(self):
+        """Monitors device connection or disconnection."""
+        if self.wait_for_connection:
+            # Wait for a device to connect
+            from core.utils.adb_runner import wait_for_device_connection
+
+            wait_for_device_connection(self.verbose)
+            if not self.should_stop:
+                self.device_connected.emit()
+        else:
+            # Wait for a device to disconnect
+            if is_device_connected():
+                wait_for_device_disconnection(self.verbose)
+                if not self.should_stop:
+                    self.device_disconnected.emit()
+
+    def stop(self):
+        """Stops monitoring."""
+        self.should_stop = True
 
 
 class InformationPopup(QDialog):
     """
     "Instruction" dialog.
     """
+
+    device_disconnected = pyqtSignal()  # Signal emitted when device is unplugged
+    device_connected = pyqtSignal()  # Signal emitted when device is plugged
 
     def load_fonts(self):
         """Loads custom fonts from the fonts folder."""
@@ -70,6 +107,9 @@ class InformationPopup(QDialog):
         self.setModal(True)
         self.setFixedSize(356, 375)
 
+        # Device monitoring thread
+        self.monitor_thread = None
+
         self.load_fonts()
 
         # Configuration of flags for rounded corners and remove title bar and buttons
@@ -81,6 +121,33 @@ class InformationPopup(QDialog):
         # Interface configuration
         self.setup_ui()
         self.setup_styles()
+
+        # Always start monitoring if we have a connected device
+        # (whether waiting for connection or disconnection)
+        self.start_device_monitoring()
+
+    def start_device_monitoring(self):
+        """Starts device connection/disconnection monitoring."""
+        # If plugged=True, we wait for disconnection
+        # If plugged=False, we wait for connection
+        wait_for_connection = not self.plugged
+
+        self.monitor_thread = DeviceMonitorThread(
+            wait_for_connection=wait_for_connection, verbose=False
+        )
+        self.monitor_thread.device_disconnected.connect(self.on_device_disconnected)
+        self.monitor_thread.device_connected.connect(self.on_device_connected)
+        self.monitor_thread.start()
+
+    def on_device_disconnected(self):
+        """Called when device is unplugged."""
+        self.device_disconnected.emit()  # Emit signal to the outside
+        self.accept()  # Close popup
+
+    def on_device_connected(self):
+        """Called when device is plugged."""
+        self.device_connected.emit()  # Emit signal to the outside
+        self.accept()  # Close popup
 
     def setup_ui(self):
         """Configure the user interface."""
@@ -192,6 +259,13 @@ class InformationPopup(QDialog):
 
                 """
             )
+
+    def closeEvent(self, event):
+        """Clean up thread before closing."""
+        if self.monitor_thread and self.monitor_thread.isRunning():
+            self.monitor_thread.stop()
+            self.monitor_thread.wait()
+        event.accept()
 
 
 if __name__ == "__main__":

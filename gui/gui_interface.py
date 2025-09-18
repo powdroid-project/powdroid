@@ -10,6 +10,7 @@ if __name__ == "__main__":
 from gui.popup.information_plug_phone import InformationPopup
 from gui.popup.about import AboutDialog
 from gui.popup.check_config import CheckConfigDialog
+from gui.pages.homepage import MainDialog
 
 
 def load_config():
@@ -45,46 +46,9 @@ def main():
 
     if checkConfig.exec() == QDialog.DialogCode.Accepted:
 
-        # Variables globales pour garder les références
-        popup1 = None
-        popup2 = None
-        timer1 = None
-        timer2 = None
-
-        def show_second_popup():
-            nonlocal popup2, timer2
-            # Show second popup (plugged)
-            popup2 = InformationPopup(
-                dark_theme=current_theme, language=current_language, plugged=True
-            )
-            popup2.show()
-
-            # Timer to close second popup
-            timer2 = QTimer()
-            timer2.timeout.connect(popup2.close)
-            timer2.timeout.connect(show_about_dialog)
-            timer2.setSingleShot(True)
-            timer2.start(3000)
-
-        def show_about_dialog():
-            aboutDialog = AboutDialog(
-                dark_theme=current_theme, language=current_language
-            )
-            aboutDialog.exec()
-            app.quit()  # Quitter l'application après le dialog About
-
-        # Show first popup (unplugged)
-        popup1 = InformationPopup(
-            dark_theme=current_theme, language=current_language, plugged=False
-        )
-        popup1.show()
-
-        # Timer to close first popup and show second
-        timer1 = QTimer()
-        timer1.timeout.connect(popup1.close)
-        timer1.timeout.connect(show_second_popup)
-        timer1.setSingleShot(True)
-        timer1.start(3000)
+        # Then show the main dialog
+        main_dialog = MainDialog(dark_theme=current_theme, language=current_language)
+        main_dialog.show()
 
         # Start the event loop
         app.exec()

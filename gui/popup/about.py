@@ -63,7 +63,7 @@ class AboutDialog(QDialog):
         self.dark_theme = dark_theme
         self.language = language
         self.setModal(True)
-        self.setFixedSize(550, 573)
+        self.setFixedSize(550, 900)
 
         self.load_fonts()
 
@@ -122,7 +122,7 @@ class AboutDialog(QDialog):
 
         # Header with the title of the window inside a square box (Not USED)
         title_label = QLabel("ABOUT")
-        title_font = QFont(self.font_family, 24, QFont.Weight.DemiBold)
+        title_font = QFont(self.font_family, 20, QFont.Weight.DemiBold)
         title_label.setFont(title_font)
         if self.dark_theme == "dark":
             title_label.setStyleSheet("color: #D2D2D2;")
@@ -167,7 +167,7 @@ class AboutDialog(QDialog):
 
         # Label with the version of PowDroid aligned to the right
         version_label = QLabel("v1.0")
-        version_font = QFont(self.font_family, 20, QFont.Weight.Medium)
+        version_font = QFont(self.font_family, 16, QFont.Weight.Medium)
         version_label.setFont(version_font)
         if self.dark_theme == "dark":
             version_label.setStyleSheet("color: #D2D2D2;")
@@ -186,7 +186,7 @@ class AboutDialog(QDialog):
         else:
             description_label.setStyleSheet("color: #000000;")
         description_label.setWordWrap(True)
-        description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        description_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         description_label.setContentsMargins(0, 0, 0, 0)
 
         # Label for the license of PowDroid

@@ -3,3 +3,4 @@ __pycache__/
 dump
 .vscode
 .DS_Store
+tmp
