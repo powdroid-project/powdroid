@@ -17,6 +17,8 @@ from PyQt6.QtWidgets import (
     QWidget,
     QSizePolicy,
     QMessageBox,
+    QTabWidget,
+    QApplication,
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QFont, QPixmap, QFontDatabase
@@ -33,61 +35,127 @@ import matplotlib.dates as mdates
 class BatteryReportCanvas(FigureCanvas):
     """Custom matplotlib canvas for cumulative energy graph"""
 
-    def __init__(self, parent=None, width=12, height=6, dpi=100):
+    def __init__(self, parent=None, width=12, height=6, dpi=100, dark_theme="dark", is_fullscreen=False):
         self.figure = Figure(figsize=(width, height), dpi=dpi)
         super(BatteryReportCanvas, self).__init__(self.figure)
         self.setParent(parent)
+        self.dark_theme = dark_theme
+        self.csv_data = None  # Store data for re-plotting
+        self.parent_dialog = parent  # Store reference to parent dialog
+        self.is_fullscreen = is_fullscreen  # Flag to disable clicks in fullscreen
 
         FigureCanvas.setSizePolicy(
             self, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
         FigureCanvas.updateGeometry(self)
 
-        plt.style.use("dark_background")
-        self.figure.patch.set_facecolor("#2b2b2b")
+        self.apply_theme()
+        
+        # Add click event handler only if not in fullscreen
+        if not self.is_fullscreen:
+            self.mpl_connect('button_press_event', self.on_click)
+
+    def on_click(self, event):
+        """Handle mouse click events to open full screen"""
+        if event.inaxes is not None and hasattr(self, 'csv_data') and self.csv_data:
+            # Find the main dialog parent to get theme and csv path
+            parent = self.parent_dialog
+            while parent and not hasattr(parent, 'dark_theme'):
+                parent = parent.parent() if hasattr(parent, 'parent') else None
+            
+            if parent and hasattr(parent, 'dark_theme'):
+                full_screen_dialog = FullScreenGraphDialog(
+                    csv_file_path=self.csv_data,
+                    graph_type="cumulative",
+                    dark_theme=parent.dark_theme,
+                    parent=parent
+                )
+                full_screen_dialog.exec()
+
+    def apply_theme(self):
+        """Apply theme-specific styling to the matplotlib figure"""
+        if self.dark_theme == "dark":
+            plt.style.use("dark_background")
+            self.figure.patch.set_facecolor("#2b2b2b")
+        else:
+            plt.style.use("default")
+            self.figure.patch.set_facecolor("#f5f5f5")
+
+    def update_theme(self, dark_theme):
+        """Update the theme and re-plot the data"""
+        self.dark_theme = dark_theme
+        self.apply_theme()
+        if self.csv_data is not None:
+            self.plot_battery_data(self.csv_data)
+
+    def get_theme_colors(self):
+        """Get colors based on current theme"""
+        if self.dark_theme == "dark":
+            return {
+                "line_color": "#5374C9",
+                "text_color": "white",
+                "grid_color": "white",
+                "background_color": "#2b2b2b"
+            }
+        else:
+            return {
+                "line_color": "#2E4BC6",
+                "text_color": "black",
+                "grid_color": "gray",
+                "background_color": "#f5f5f5"
+            }
 
     def plot_battery_data(self, csv_file_path):
         """Plot cumulative energy data from CSV file"""
         try:
+            self.csv_data = csv_file_path  # Store for re-plotting
             df = pd.read_csv(csv_file_path)
 
             df["start_datetime"] = pd.to_datetime(df["start_time"], unit="ms")
-
             df["Cumulative_Energy"] = df["Energy (J)"].cumsum()
 
             self.figure.clear()
+            colors = self.get_theme_colors()
 
             ax = self.figure.add_subplot(111)
 
             ax.plot(
                 df["start_datetime"],
                 df["Cumulative_Energy"],
-                color="#5374C9",
+                color=colors["line_color"],
                 linewidth=2,
                 marker="o",
                 markersize=1,
             )
 
             ax.set_title(
-                "Cumulative Energy Consumption", fontsize=16, color="white", pad=20
+                "Cumulative Energy Consumption", 
+                fontsize=16, 
+                color=colors["text_color"], 
+                pad=20
             )
-            ax.set_xlabel("Time", fontsize=12, color="white")
-            ax.set_ylabel("Cumulative Energy (J)", fontsize=12, color="white")
-            ax.grid(True, alpha=0.3, color="white")
-            ax.tick_params(colors="white")
+            ax.set_xlabel("Time", fontsize=12, color=colors["text_color"])
+            ax.set_ylabel("Cumulative Energy (J)", fontsize=12, color=colors["text_color"])
+            ax.grid(True, alpha=0.3, color=colors["grid_color"])
+            ax.tick_params(colors=colors["text_color"])
 
             ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
             ax.tick_params(axis="x", rotation=45)
 
-            ax.set_facecolor("#2b2b2b")
+            ax.set_facecolor(colors["background_color"])
 
-            self.figure.tight_layout()
-
+            # Adjust layout to fit the frame better
+            self.figure.tight_layout(pad=1.0)
+            
+            # Additional adjustment for better fit
+            self.figure.subplots_adjust(left=0.1, right=0.95, top=0.9, bottom=0.15)
+            
             self.draw()
 
         except Exception as e:
             print(f"Error plotting battery data: {e}")
             self.figure.clear()
+            colors = self.get_theme_colors()
             ax = self.figure.add_subplot(111)
             ax.text(
                 0.5,
@@ -99,7 +167,145 @@ class BatteryReportCanvas(FigureCanvas):
                 fontsize=14,
                 color="red",
             )
-            ax.set_facecolor("#2b2b2b")
+            ax.set_facecolor(colors["background_color"])
+            self.draw()
+
+
+class EnergyCanvas(FigureCanvas):
+    """Custom matplotlib canvas for normal energy graph"""
+
+    def __init__(self, parent=None, width=12, height=6, dpi=100, dark_theme="dark", is_fullscreen=False):
+        self.figure = Figure(figsize=(width, height), dpi=dpi)
+        super(EnergyCanvas, self).__init__(self.figure)
+        self.setParent(parent)
+        self.dark_theme = dark_theme
+        self.csv_data = None  # Store data for re-plotting
+        self.parent_dialog = parent  # Store reference to parent dialog
+        self.is_fullscreen = is_fullscreen  # Flag to disable clicks in fullscreen
+
+        FigureCanvas.setSizePolicy(
+            self, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        FigureCanvas.updateGeometry(self)
+
+        self.apply_theme()
+        
+        # Add click event handler only if not in fullscreen
+        if not self.is_fullscreen:
+            self.mpl_connect('button_press_event', self.on_click)
+
+    def on_click(self, event):
+        """Handle mouse click events to open full screen"""
+        if event.inaxes is not None and hasattr(self, 'csv_data') and self.csv_data:
+            # Find the main dialog parent to get theme and csv path
+            parent = self.parent_dialog
+            while parent and not hasattr(parent, 'dark_theme'):
+                parent = parent.parent() if hasattr(parent, 'parent') else None
+            
+            if parent and hasattr(parent, 'dark_theme'):
+                full_screen_dialog = FullScreenGraphDialog(
+                    csv_file_path=self.csv_data,
+                    graph_type="energy",
+                    dark_theme=parent.dark_theme,
+                    parent=parent
+                )
+                full_screen_dialog.exec()
+
+    def apply_theme(self):
+        """Apply theme-specific styling to the matplotlib figure"""
+        if self.dark_theme == "dark":
+            plt.style.use("dark_background")
+            self.figure.patch.set_facecolor("#2b2b2b")
+        else:
+            plt.style.use("default")
+            self.figure.patch.set_facecolor("#f5f5f5")
+
+    def update_theme(self, dark_theme):
+        """Update the theme and re-plot the data"""
+        self.dark_theme = dark_theme
+        self.apply_theme()
+        if self.csv_data is not None:
+            self.plot_energy_data(self.csv_data)
+
+    def get_theme_colors(self):
+        """Get colors based on current theme"""
+        if self.dark_theme == "dark":
+            return {
+                "line_color": "#FF6B6B",
+                "text_color": "white",
+                "grid_color": "white",
+                "background_color": "#2b2b2b"
+            }
+        else:
+            return {
+                "line_color": "#D63384",
+                "text_color": "black",
+                "grid_color": "gray",
+                "background_color": "#f5f5f5"
+            }
+
+    def plot_energy_data(self, csv_file_path):
+        """Plot normal energy data from CSV file"""
+        try:
+            self.csv_data = csv_file_path  # Store for re-plotting
+            df = pd.read_csv(csv_file_path)
+
+            df["start_datetime"] = pd.to_datetime(df["start_time"], unit="ms")
+
+            self.figure.clear()
+            colors = self.get_theme_colors()
+
+            ax = self.figure.add_subplot(111)
+
+            ax.plot(
+                df["start_datetime"],
+                df["Energy (J)"],
+                color=colors["line_color"],
+                linewidth=2,
+                marker="o",
+                markersize=1,
+            )
+
+            ax.set_title(
+                "Energy Consumption", 
+                fontsize=16, 
+                color=colors["text_color"], 
+                pad=20
+            )
+            ax.set_xlabel("Time", fontsize=12, color=colors["text_color"])
+            ax.set_ylabel("Energy (J)", fontsize=12, color=colors["text_color"])
+            ax.grid(True, alpha=0.3, color=colors["grid_color"])
+            ax.tick_params(colors=colors["text_color"])
+
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
+            ax.tick_params(axis="x", rotation=45)
+
+            ax.set_facecolor(colors["background_color"])
+
+            # Adjust layout to fit the frame better
+            self.figure.tight_layout(pad=1.0)
+            
+            # Additional adjustment for better fit
+            self.figure.subplots_adjust(left=0.1, right=0.95, top=0.9, bottom=0.15)
+            
+            self.draw()
+
+        except Exception as e:
+            print(f"Error plotting energy data: {e}")
+            self.figure.clear()
+            colors = self.get_theme_colors()
+            ax = self.figure.add_subplot(111)
+            ax.text(
+                0.5,
+                0.5,
+                f"Error loading data:\n{str(e)}",
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=14,
+                color="red",
+            )
+            ax.set_facecolor(colors["background_color"])
             self.draw()
 
 
@@ -299,18 +505,6 @@ class BatteryReportDialog(QDialog):
                 )
 
         content_layout = self.main_frame.layout()
-        for i in range(content_layout.count()):
-            widget = content_layout.itemAt(i).widget()
-            if isinstance(widget, QFrame) and widget.size() == QSize(499, 400):
-                if self.dark_theme == "dark":
-                    widget.setStyleSheet(
-                        "background-color: #282828; border: 1px solid #3C3C3C; border-radius: 8px;"
-                    )
-                else:
-                    widget.setStyleSheet(
-                        "background-color: #EEEEEE; border: 1px solid #D9D9D9; border-radius: 8px;"
-                    )
-                break
 
         for i in range(content_layout.count()):
             widget = content_layout.itemAt(i).widget()
@@ -357,9 +551,10 @@ class BatteryReportDialog(QDialog):
                 """
                 )
 
-        if hasattr(self, "canvas"):
-            self.canvas.figure.patch.set_facecolor("#2b2b2b")
-            self.canvas.draw()
+        if hasattr(self, "cumulative_canvas") and hasattr(self, "energy_canvas"):
+            # Update theme for both canvas
+            self.cumulative_canvas.update_theme(self.dark_theme)
+            self.energy_canvas.update_theme(self.dark_theme)
 
     def setup_ui(self):
         """Configure the user interface."""
@@ -463,24 +658,33 @@ class BatteryReportDialog(QDialog):
             self.title_frame, alignment=Qt.AlignmentFlag.AlignCenter
         )
 
-        chart_frame = QFrame()
-        if self.dark_theme == "dark":
-            chart_frame.setStyleSheet(
-                "background-color: #282828; border: 1px solid #3C3C3C; border-radius: 8px;"
-            )
-        else:
-            chart_frame.setStyleSheet(
-                "background-color: #EEEEEE; border: 1px solid #D9D9D9; border-radius: 8px;"
-            )
-        chart_frame.setFixedSize(499, 400)
+        # Create tab widget for different chart views
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setFixedSize(499, 440)
+        
+        # Cumulative Energy Tab
+        cumulative_tab = QWidget()
+        cumulative_layout = QVBoxLayout(cumulative_tab)
+        cumulative_layout.setContentsMargins(10, 10, 10, 10)
+        cumulative_layout.setSpacing(0)
+        
+        self.cumulative_canvas = BatteryReportCanvas(self, width=8, height=4, dpi=80, dark_theme=self.dark_theme, is_fullscreen=False)
+        cumulative_layout.addWidget(self.cumulative_canvas)
+        
+        self.tab_widget.addTab(cumulative_tab, "Cumulative Energy")
+        
+        # Normal Energy Tab
+        energy_tab = QWidget()
+        energy_layout = QVBoxLayout(energy_tab)
+        energy_layout.setContentsMargins(10, 10, 10, 10)
+        energy_layout.setSpacing(0)
+        
+        self.energy_canvas = EnergyCanvas(self, width=8, height=4, dpi=80, dark_theme=self.dark_theme, is_fullscreen=False)
+        energy_layout.addWidget(self.energy_canvas)
+        
+        self.tab_widget.addTab(energy_tab, "Energy")
 
-        chart_layout = QVBoxLayout(chart_frame)
-        chart_layout.setContentsMargins(15, 15, 15, 15)
-
-        self.canvas = BatteryReportCanvas(chart_frame, width=8, height=4, dpi=80)
-        chart_layout.addWidget(self.canvas)
-
-        content_layout.addWidget(chart_frame)
+        content_layout.addWidget(self.tab_widget)
 
         self.file_path_label = QLabel()
         self.file_path_label.setFont(QFont(self.font_family, 10))
@@ -571,6 +775,37 @@ class BatteryReportDialog(QDialog):
                     background-color: #1D1D1D;
                     opacity: 0.7;
                 }
+                
+                QTabWidget::pane {
+                    border: 1px solid #3C3C3C;
+                    background-color: #282828;
+                    border-radius: 8px;
+                }
+                
+                QTabWidget::tab-bar {
+                    alignment: center;
+                }
+                
+                QTabBar::tab {
+                    background-color: #1D1D1D;
+                    color: #D2D2D2;
+                    border: 1px solid #3C3C3C;
+                    padding: 8px 16px;
+                    margin-right: 2px;
+                    border-top-left-radius: 8px;
+                    border-top-right-radius: 8px;
+                    min-width: 120px;
+                }
+                
+                QTabBar::tab:selected {
+                    background-color: #282828;
+                    color: #FFFFFF;
+                    border-bottom: 1px solid #282828;
+                }
+                
+                QTabBar::tab:hover {
+                    background-color: #3C3C3C;
+                }
                 """
             )
         else:
@@ -584,6 +819,37 @@ class BatteryReportDialog(QDialog):
                     border-radius: 5px;
                     background-color: white;
                     opacity: 0.7;
+                }
+                
+                QTabWidget::pane {
+                    border: 1px solid #D9D9D9;
+                    background-color: #EEEEEE;
+                    border-radius: 8px;
+                }
+                
+                QTabWidget::tab-bar {
+                    alignment: center;
+                }
+                
+                QTabBar::tab {
+                    background-color: #F5F5F5;
+                    color: #333333;
+                    border: 1px solid #D9D9D9;
+                    padding: 8px 16px;
+                    margin-right: 2px;
+                    border-top-left-radius: 8px;
+                    border-top-right-radius: 8px;
+                    min-width: 120px;
+                }
+                
+                QTabBar::tab:selected {
+                    background-color: #EEEEEE;
+                    color: #000000;
+                    border-bottom: 1px solid #EEEEEE;
+                }
+                
+                QTabBar::tab:hover {
+                    background-color: #E0E0E0;
                 }
                 """
             )
@@ -630,7 +896,12 @@ class BatteryReportDialog(QDialog):
 
         try:
             # Plot cumulative energy graph
-            self.canvas.plot_battery_data(csv_file_path)
+            if hasattr(self, "cumulative_canvas"):
+                self.cumulative_canvas.plot_battery_data(csv_file_path)
+            
+            # Plot normal energy graph
+            if hasattr(self, "energy_canvas"):
+                self.energy_canvas.plot_energy_data(csv_file_path)
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load report data: {str(e)}")
@@ -640,6 +911,119 @@ class BatteryReportDialog(QDialog):
         self.csv_file_path = csv_file_path
         self.update_file_path_label()
         self.load_report_data(csv_file_path)
+
+
+class FullScreenGraphDialog(QDialog):
+    """Full screen dialog for displaying graphs"""
+    
+    def __init__(self, csv_file_path, graph_type, dark_theme="dark", parent=None):
+        """
+        Initialize the full screen graph dialog.
+        
+        Args:
+            csv_file_path: Path to the CSV file
+            graph_type: Type of graph ("cumulative" or "energy")
+            dark_theme: Theme mode ("dark" or "light")
+            parent: Parent widget
+        """
+        super().__init__(parent)
+        self.csv_file_path = csv_file_path
+        self.graph_type = graph_type
+        self.dark_theme = dark_theme
+        
+        # macOS-compatible full screen setup
+        self.setWindowFlags(Qt.WindowType.Window)
+        self.setModal(True)
+        
+        # Get screen geometry
+        screen = QApplication.primaryScreen()
+        screen_geometry = screen.geometry()
+        
+        # Set window to cover the entire screen
+        self.setGeometry(screen_geometry)
+        self.setWindowState(Qt.WindowState.WindowMaximized)
+        
+        self.setup_ui()
+        self.setup_styles()
+        
+        # Load the graph data
+        if csv_file_path and os.path.exists(csv_file_path):
+            self.load_graph_data()
+    
+    def setup_ui(self):
+        """Setup the full screen UI"""
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(40, 40, 40, 40)
+        
+        # Header with title only
+        header_layout = QHBoxLayout()
+        
+        # Title
+        title_text = "Cumulative Energy Consumption" if self.graph_type == "cumulative" else "Energy Consumption"
+        self.title_label = QLabel(title_text)
+        title_font = QFont("Arial", 28, QFont.Weight.Bold)
+        self.title_label.setFont(title_font)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        header_layout.addWidget(self.title_label)
+        
+        main_layout.addLayout(header_layout)
+        
+        # Add some spacing
+        main_layout.addSpacing(20)
+        
+        # Graph canvas
+        if self.graph_type == "cumulative":
+            self.canvas = BatteryReportCanvas(self, width=18, height=12, dpi=100, dark_theme=self.dark_theme, is_fullscreen=True)
+        else:
+            self.canvas = EnergyCanvas(self, width=18, height=12, dpi=100, dark_theme=self.dark_theme, is_fullscreen=True)
+        
+        main_layout.addWidget(self.canvas)
+        
+        # Instructions
+        instruction_label = QLabel("Press ESC to exit full screen")
+        instruction_label.setFont(QFont("Arial", 12))
+        instruction_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(instruction_label)
+        
+        self.setLayout(main_layout)
+    
+    def setup_styles(self):
+        """Setup styles based on theme"""
+        if self.dark_theme == "dark":
+            self.setStyleSheet("""
+                FullScreenGraphDialog {
+                    background-color: #1D1D1D;
+                }
+                QLabel {
+                    color: white;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                FullScreenGraphDialog {
+                    background-color: white;
+                }
+                QLabel {
+                    color: black;
+                }
+            """)
+    
+    def load_graph_data(self):
+        """Load and display the graph data"""
+        try:
+            if self.graph_type == "cumulative":
+                self.canvas.plot_battery_data(self.csv_file_path)
+            else:
+                self.canvas.plot_energy_data(self.csv_file_path)
+        except Exception as e:
+            print(f"Error loading full screen graph: {e}")
+    
+    def keyPressEvent(self, event):
+        """Handle key press events"""
+        if event.key() == Qt.Key.Key_Escape:
+            self.close()
+        super().keyPressEvent(event)
 
 
 def find_latest_csv_file():
