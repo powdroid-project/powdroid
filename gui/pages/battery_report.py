@@ -5,6 +5,8 @@ Displays battery usage statistics and graphs based on CSV data.
 
 import os
 import pandas as pd
+import subprocess
+import platform
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog,
@@ -13,15 +15,11 @@ from PyQt6.QtWidgets import (
     QLabel,
     QFrame,
     QWidget,
-    QPushButton,
-    QScrollArea,
     QSizePolicy,
-    QTabWidget,
-    QGridLayout,
     QMessageBox,
 )
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QFont, QPixmap, QIcon, QFontDatabase
+from PyQt6.QtGui import QFont, QPixmap, QFontDatabase
 from typing import Optional
 import matplotlib
 
@@ -30,9 +28,6 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.dates as mdates
-from datetime import datetime
-import numpy as np
-from gui.i18n import t
 
 
 class BatteryReportCanvas(FigureCanvas):
@@ -202,15 +197,56 @@ class BatteryReportDialog(QDialog):
         dialog = AboutDialog(self, dark_theme=self.dark_theme, language=self.language)
         dialog.exec()
 
+    def open_file_location(self):
+        """Open the directory containing the CSV file in the system file manager."""
+        if not self.csv_file_path or not os.path.exists(self.csv_file_path):
+            QMessageBox.warning(self, "Error", "No valid CSV file found.")
+            return
+
+        try:
+            file_path = os.path.abspath(self.csv_file_path)
+            directory = os.path.dirname(file_path)
+
+            system = platform.system()
+            if system == "Darwin":
+                subprocess.run(["open", directory])
+            elif system == "Windows":
+                subprocess.run(["explorer", directory])
+            elif system == "Linux":
+                subprocess.run(["xdg-open", directory])
+            else:
+                QMessageBox.information(
+                    self,
+                    "Information",
+                    f"Cannot open directory automatically.\n" f"Path: {directory}",
+                )
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Cannot open directory: {str(e)}")
+
+    def update_file_path_label(self):
+        """Update the file path label with the current CSV file path."""
+        if hasattr(self, "file_path_label") and self.csv_file_path:
+            file_path = Path(self.csv_file_path)
+            parent_dir = file_path.parent.name
+            file_name = file_path.name
+
+            if parent_dir:
+                display_text = f"📁 {parent_dir}/{file_name}"
+            else:
+                display_text = f"📁 {file_name}"
+
+            self.file_path_label.setText(display_text)
+            self.file_path_label.show()
+        elif hasattr(self, "file_path_label"):
+            self.file_path_label.hide()
+
     def update_theme_button_icon(self):
         """Update the theme button icon based on the current theme."""
         if self.dark_theme == "dark":
-            # In dark theme, show light theme icon (suggesting switch to light)
-            icon_path = "gui/ressources/light.png"  # You can replace with a specific light theme icon
+            icon_path = "gui/ressources/light.png"
         else:
-            # In light theme, show dark theme icon (suggesting switch to dark)
-            icon_path = "gui/ressources/dark.png"  # You can replace with a specific dark theme icon
-        
+            icon_path = "gui/ressources/dark.png"
+
         if os.path.exists(icon_path):
             self.theme_button.setPixmap(
                 QPixmap(icon_path).scaled(
@@ -226,7 +262,7 @@ class BatteryReportDialog(QDialog):
         self.dark_theme = "light" if self.dark_theme == "dark" else "dark"
 
         self.setup_styles()
-        self.update_theme_button_icon()  # Update theme button icon
+        self.update_theme_button_icon()
 
         if self.dark_theme == "dark":
             close_icon_path = "gui/ressources/close_white.png"
@@ -284,6 +320,42 @@ class BatteryReportDialog(QDialog):
                 else:
                     widget.setStyleSheet("color: #313131;")
                 break
+
+        if hasattr(self, "file_path_label"):
+            if self.dark_theme == "dark":
+                self.file_path_label.setStyleSheet(
+                    """
+                    QLabel {
+                        color: #A0A0A0;
+                        background-color: #2b2b2b;
+                        border: 1px solid #3C3C3C;
+                        border-radius: 4px;
+                        padding: 5px;
+                    }
+                    QLabel:hover {
+                        color: #FFFFFF;
+                        background-color: #3C3C3C;
+                        border: 1px solid #4C4C4C;
+                    }
+                """
+                )
+            else:
+                self.file_path_label.setStyleSheet(
+                    """
+                    QLabel {
+                        color: #666666;
+                        background-color: #F5F5F5;
+                        border: 1px solid #D9D9D9;
+                        border-radius: 4px;
+                        padding: 5px;
+                    }
+                    QLabel:hover {
+                        color: #333333;
+                        background-color: #E8E8E8;
+                        border: 1px solid #CCCCCC;
+                    }
+                """
+                )
 
         if hasattr(self, "canvas"):
             self.canvas.figure.patch.set_facecolor("#2b2b2b")
@@ -410,6 +482,61 @@ class BatteryReportDialog(QDialog):
 
         content_layout.addWidget(chart_frame)
 
+        self.file_path_label = QLabel()
+        self.file_path_label.setFont(QFont(self.font_family, 10))
+        self.file_path_label.setWordWrap(True)
+        self.file_path_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.file_path_label.setToolTip(
+            "Click to open the directory containing the file"
+        )
+        self.file_path_label.mousePressEvent = lambda _: self.open_file_location()
+        self.file_path_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.file_path_label.setMaximumWidth(480)
+
+        if self.dark_theme == "dark":
+            self.file_path_label.setStyleSheet(
+                """
+                QLabel {
+                    color: #A0A0A0;
+                    background-color: #2b2b2b;
+                    border: 1px solid #3C3C3C;
+                    border-radius: 4px;
+                    padding: 5px;
+                }
+                QLabel:hover {
+                    color: #FFFFFF;
+                    background-color: #3C3C3C;
+                    border: 1px solid #4C4C4C;
+                }
+            """
+            )
+        else:
+            self.file_path_label.setStyleSheet(
+                """
+                QLabel {
+                    color: #666666;
+                    background-color: #F5F5F5;
+                    border: 1px solid #D9D9D9;
+                    border-radius: 4px;
+                    padding: 5px;
+                }
+                QLabel:hover {
+                    color: #333333;
+                    background-color: #E8E8E8;
+                    border: 1px solid #CCCCCC;
+                }
+            """
+            )
+
+        if not self.csv_file_path:
+            self.file_path_label.hide()
+        else:
+            self.update_file_path_label()
+
+        content_layout.addWidget(
+            self.file_path_label, alignment=Qt.AlignmentFlag.AlignCenter
+        )
+
         question_label = QLabel("?")
         question_label.setFont(QFont(self.font_family, 32, QFont.Weight.Bold))
         question_label.setToolTip("About PowDroid")
@@ -511,6 +638,7 @@ class BatteryReportDialog(QDialog):
     def set_csv_file(self, csv_file_path):
         """Set the CSV file path and load data"""
         self.csv_file_path = csv_file_path
+        self.update_file_path_label()
         self.load_report_data(csv_file_path)
 
 
