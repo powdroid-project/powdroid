@@ -60,10 +60,11 @@ def look_up(file_name, start_time, end_time):
         (start_time >= file_readed.start_time) & (end_time <= file_readed.end_time)
     ]
     if len(found) == 0:
-        metric_value = 0.0
-    else:
-        metric_value = found["value"].values
-    return metric_value
+        return 0.0
+    values = found["value"]
+    if hasattr(values, "values"):
+        return values.values
+    return values
 
 
 def look_up_intensity(file_name, start_time, end_time):
@@ -74,19 +75,20 @@ def look_up_intensity(file_name, start_time, end_time):
     ]
 
     if len(found) == 0:
-        amp = 0
-    else:
-        charge_consumed = found["value"] - found["next_value"]
-        duration_sec = (file_readed.end_time - file_readed.start_time) / 1000
-        duration_hr = duration_sec / 3600
-        duration_hr = (
-            duration_hr.replace(0, float("nan"))
-            if hasattr(duration_hr, "replace")
-            else duration_hr
-        )
-        amp_value = charge_consumed / duration_hr
-        amp = amp_value.dropna()
-    return amp.values
+        return 0.0
+    charge_consumed = found["value"] - found["next_value"]
+    duration_sec = (file_readed.end_time - file_readed.start_time) / 1000
+    duration_hr = duration_sec / 3600
+    duration_hr = (
+        duration_hr.replace(0, float("nan"))
+        if hasattr(duration_hr, "replace")
+        else duration_hr
+    )
+    amp_value = charge_consumed / duration_hr
+    amp = amp_value.dropna()
+    if hasattr(amp, "values"):
+        return amp.values
+    return amp
 
 
 def look_up_bool(file_name, start_time, end_time):
@@ -157,6 +159,7 @@ def process_csv_file(init_test_time, end_test_time):
             except Exception:
                 return None
 
+              
         for i in range(n_intervals):
             start_time, end_time = time_intervals[i], time_intervals[i + 1]
             duration = end_time - start_time
