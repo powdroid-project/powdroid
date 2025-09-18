@@ -494,6 +494,12 @@ class BatteryReportDialog(QDialog):
             else:
                 self.title_label.setStyleSheet("color: #000000;")
 
+        if hasattr(self, "energy_total_label"):
+            if self.dark_theme == "dark":
+                self.energy_total_label.setStyleSheet("color: #D2D2D2; margin: 10px 0px;")
+            else:
+                self.energy_total_label.setStyleSheet("color: #000000; margin: 10px 0px;")
+
         if hasattr(self, "title_frame"):
             if self.dark_theme == "dark":
                 self.title_frame.setStyleSheet(
@@ -741,6 +747,22 @@ class BatteryReportDialog(QDialog):
             self.file_path_label, alignment=Qt.AlignmentFlag.AlignCenter
         )
 
+        # Energy total label
+        self.energy_total_label = QLabel("Energy total: -- J")
+        energy_total_font = QFont(self.font_family, 14, QFont.Weight.DemiBold)
+        self.energy_total_label.setFont(energy_total_font)
+        self.energy_total_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.energy_total_label.setStyleSheet("margin: 10px 0px;")
+        
+        if self.dark_theme == "dark":
+            self.energy_total_label.setStyleSheet("color: #D2D2D2; margin: 10px 0px;")
+        else:
+            self.energy_total_label.setStyleSheet("color: #000000; margin: 10px 0px;")
+
+        content_layout.addWidget(
+            self.energy_total_label, alignment=Qt.AlignmentFlag.AlignCenter
+        )
+
         question_label = QLabel("?")
         question_label.setFont(QFont(self.font_family, 32, QFont.Weight.Bold))
         question_label.setToolTip("About PowDroid")
@@ -895,6 +917,12 @@ class BatteryReportDialog(QDialog):
             return
 
         try:
+            # Calculate total energy from CSV
+            df = pd.read_csv(csv_file_path)
+            if 'Energy (J)' in df.columns:
+                total_energy = df['Energy (J)'].sum()
+                self.update_energy_total_label(total_energy)
+            
             # Plot cumulative energy graph
             if hasattr(self, "cumulative_canvas"):
                 self.cumulative_canvas.plot_battery_data(csv_file_path)
@@ -905,6 +933,22 @@ class BatteryReportDialog(QDialog):
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load report data: {str(e)}")
+            # Set error message for energy total if CSV can't be read
+            if hasattr(self, 'energy_total_label'):
+                self.energy_total_label.setText("Energy total: Error reading data")
+
+    def update_energy_total_label(self, total_energy):
+        """Update the energy total label with formatted value"""
+        if hasattr(self, 'energy_total_label'):
+            # Format the energy value with appropriate units
+            if total_energy >= 1000000:  # >= 1 MJ
+                formatted_energy = f"{total_energy/1000000:.2f} MJ"
+            elif total_energy >= 1000:  # >= 1 kJ
+                formatted_energy = f"{total_energy/1000:.2f} kJ"
+            else:
+                formatted_energy = f"{total_energy:.2f} J"
+            
+            self.energy_total_label.setText(f"Energy total: {formatted_energy}")
 
     def set_csv_file(self, csv_file_path):
         """Set the CSV file path and load data"""
