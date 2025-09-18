@@ -327,7 +327,7 @@ class RecordDialog(QDialog):
         loading_layout.setContentsMargins(0, 0, 0, 0)
 
         spinner_label = QLabel()
-        gif_path = "gui/ressources/loading_bis.gif"
+        gif_path = "gui/ressources/loading.gif"
         if not os.path.exists(gif_path):
             spinner_label.setText("● ● ●")
             spinner_label.setStyleSheet("font-size: 24px; color: #5374C9;")
