@@ -65,7 +65,6 @@ class AboutDialog(QDialog):
         self.setModal(True)
         self.setFixedSize(550, 900)
 
-
         self.load_fonts()
 
         # Configuration of flags for rounded corners and remove title bar and buttons

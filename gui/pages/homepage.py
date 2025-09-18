@@ -389,7 +389,7 @@ class MainDialog(QDialog):
         else:
             # In light theme, show dark theme icon (suggesting switch to dark)
             icon_path = "gui/ressources/dark.png"  # You can replace with a specific dark theme icon
-        
+
         if os.path.exists(icon_path):
             self.theme_button.setPixmap(
                 QPixmap(icon_path).scaled(
@@ -601,7 +601,7 @@ class MainDialog(QDialog):
         QTimer.singleShot(100, self.start_recording)
 
     def start_recording(self):
-        """Démarre l'enregistrement après déconnexion de l'appareil."""
+        """Start recording after device disconnection."""
         # Hide the homepage while recording
         self.hide()
 

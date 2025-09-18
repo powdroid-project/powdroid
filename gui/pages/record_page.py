@@ -557,7 +557,7 @@ class RecordDialog(QDialog):
         else:
             # In light theme, show dark theme icon (suggesting switch to dark)
             icon_path = "gui/ressources/dark.png"  # You can replace with a specific dark theme icon
-        
+
         if os.path.exists(icon_path):
             self.theme_button.setPixmap(
                 QPixmap(icon_path).scaled(
