@@ -1,4 +1,4 @@
-![PowDroid logo](gui/ressources/PowDroid%20Vertical@3x.png)
+![PowDroid logo](gui/ressources/PowDroid_Vertical.png)
 
 Powdroid is a lightweight tool that profiles the energy consumption of Android apps.
 Simply test your application for a few minutes to generate a machine-ready output file containing various energy-related metrics.
