@@ -159,7 +159,7 @@ class MainDialog(QDialog):
             event.accept()
 
     def load_fonts(self):
-        """Loads custom fonts from the fonts folder."""
+        """Load custom fonts from the fonts folder."""
         current_dir = os.path.dirname(os.path.abspath(__file__))
         base_dir = os.path.join(current_dir, "..", "..")
         font_paths = [
@@ -506,8 +506,12 @@ class MainDialog(QDialog):
             self.record_button.setCursor(Qt.CursorShape.ForbiddenCursor)
 
     def check_device_status(self):
-        """Check periodically for device connection status and update UI if necessary."""
-        current_status = adb_runner.is_device_connected()
+        """Periodically check device connection status and update UI if necessary."""
+        try:
+            current_status = adb_runner.is_device_connected()
+        except Exception as e:
+            print(f"[PowDroid] Error while checking device status: {e}")
+            current_status = False
 
         if current_status != self.previous_device_status:
             self.update_phone_status(current_status)
