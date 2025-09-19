@@ -579,7 +579,10 @@ class MainDialog(QDialog):
             return
 
         adb_runner.kill_all()
+        
+        # Clear battery stats while device is still connected
         adb_runner.clear_batterystats(verbose=True)
+        
         self.popup = InformationPopup(
             parent=self,
             plugged=True,
