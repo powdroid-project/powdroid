@@ -33,11 +33,11 @@ On your phone a prompt should appear asking for permission for debugging. If the
 
 ### Running and Using PowDroid (CLI or GUI)
 
-Just run `python /path/to/powdroid.py -o csv` in your terminal and follow the on-screen instructions.
+- Command-line interface (CLI): just run `python /path/to/powdroid.py -o csv` in your terminal and follow the on-screen instructions.
 
 For more options, use the `--help` command.
 
-If no argument is provided, then the GUI mode is launched
+- Graphical interface (GUI): the GUI mode can be started by running Python without any arguments.
 
 ## 🤝 Contributors
 
