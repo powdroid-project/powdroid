@@ -31,11 +31,13 @@ First, activate *USB Debugging* in your Android phone in *developer options*.
 To verify and facilitate the use of "PowDroid" it is advised to do the first "Handshake" between your phone and the computer by connecting the phone through USB to the computer and type in a command prompt or shell the following: `adb devices`.
 On your phone a prompt should appear asking for permission for debugging. If the computer is your personal computer and safe, you should check *Always allow from this computer*.
 
-### Running and Using PowDroid
+### Running and Using PowDroid (CLI or GUI)
 
-Just run `python powdroid.py -o csv` in your terminal and follow the on-screen instructions.
+Just run `python /path/to/powdroid.py -o csv` in your terminal and follow the on-screen instructions.
 
 For more options, use the `--help` command.
+
+If no argument is provided, then the GUI mode is launched
 
 ## 🤝 Contributors
 
