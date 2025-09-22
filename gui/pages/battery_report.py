@@ -759,7 +759,7 @@ class BatteryReportDialog(QDialog):
 
         self.file_path_label = QLabel()
         self.file_path_label.setFont(QFont(self.font_family, 10))
-        self.file_path_label.setWordWrap(True)
+        self.file_path_label.setWordWrap(False)
         self.file_path_label.setCursor(Qt.CursorShape.PointingHandCursor)
         self.file_path_label.setToolTip(
             "Click to open the directory containing the file"
