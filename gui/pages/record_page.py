@@ -87,6 +87,13 @@ class RecordDialog(QDialog):
         self.setModal(True)
         self.setFixedSize(550, 900)
 
+        # Initialisation du chemin absolu vers le dossier des ressources
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.join(current_dir, "..", "..")
+        self.ressources_dir = os.path.normpath(
+            os.path.join(base_dir, "gui", "ressources")
+        )
+
         self.dragging = False
         self.drag_position = None
 
@@ -327,7 +334,7 @@ class RecordDialog(QDialog):
         loading_layout.setContentsMargins(0, 0, 0, 0)
 
         spinner_label = QLabel()
-        gif_path = "gui/ressources/loading.gif"
+        gif_path = os.path.join(self.ressources_dir, "loading.gif")
         if not os.path.exists(gif_path):
             spinner_label.setText("● ● ●")
             spinner_label.setStyleSheet("font-size: 24px; color: #5374C9;")
@@ -418,8 +425,9 @@ class RecordDialog(QDialog):
 
         close_button = QLabel(self)
         if self.dark_theme == "dark":
+            close_img_path = os.path.join(self.ressources_dir, "close_white.png")
             close_button.setPixmap(
-                QPixmap("gui/ressources/close_white.png").scaled(
+                QPixmap(close_img_path).scaled(
                     40,
                     40,
                     Qt.AspectRatioMode.KeepAspectRatio,
@@ -427,8 +435,9 @@ class RecordDialog(QDialog):
                 )
             )
         else:
+            close_img_path = os.path.join(self.ressources_dir, "close.png")
             close_button.setPixmap(
-                QPixmap("gui/ressources/close.png").scaled(
+                QPixmap(close_img_path).scaled(
                     40,
                     40,
                     Qt.AspectRatioMode.KeepAspectRatio,
@@ -449,8 +458,9 @@ class RecordDialog(QDialog):
 
         # Logo
         logo_label = QLabel()
+        logo_img_path = os.path.join(self.ressources_dir, "PowDroid_Vertical.png")
         logo_label.setPixmap(
-            QPixmap("gui/ressources/PowDroid_Vertical.png").scaled(
+            QPixmap(logo_img_path).scaled(
                 497,
                 90,
                 Qt.AspectRatioMode.KeepAspectRatio,
@@ -501,7 +511,8 @@ class RecordDialog(QDialog):
 
         # Stop button
         self.stop_button = QPushButton("STOP RECORDING")
-        self.stop_button.setIcon(QIcon("gui/ressources/stop.png"))
+        stop_icon_path = os.path.join(self.ressources_dir, "stop.png")
+        self.stop_button.setIcon(QIcon(stop_icon_path))
         self.stop_button.setIconSize(QSize(60, 60))
         if self.dark_theme == "dark":
             self.stop_button.setStyleSheet(
@@ -552,12 +563,9 @@ class RecordDialog(QDialog):
     def update_theme_button_icon(self):
         """Update the theme button icon based on the current theme."""
         if self.dark_theme == "dark":
-            # In dark theme, show light theme icon (suggesting switch to light)
-            icon_path = "gui/ressources/light.png"  # You can replace with a specific light theme icon
+            icon_path = os.path.join(self.ressources_dir, "light.png")
         else:
-            # In light theme, show dark theme icon (suggesting switch to dark)
-            icon_path = "gui/ressources/dark.png"  # You can replace with a specific dark theme icon
-
+            icon_path = os.path.join(self.ressources_dir, "dark.png")
         if os.path.exists(icon_path):
             self.theme_button.setPixmap(
                 QPixmap(icon_path).scaled(
@@ -576,9 +584,9 @@ class RecordDialog(QDialog):
         self.update_theme_button_icon()  # Update theme button icon
 
         if self.dark_theme == "dark":
-            close_icon_path = "gui/ressources/close_white.png"
+            close_icon_path = os.path.join(self.ressources_dir, "close_white.png")
         else:
-            close_icon_path = "gui/ressources/close.png"
+            close_icon_path = os.path.join(self.ressources_dir, "close.png")
 
         header_layout = self.main_frame.layout().itemAt(0).layout()
         close_button = header_layout.itemAt(2).widget()

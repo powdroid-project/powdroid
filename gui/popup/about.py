@@ -67,6 +67,13 @@ class AboutDialog(QDialog):
 
         self.load_fonts()
 
+        # Initialisation du chemin absolu vers le dossier des ressources
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.join(current_dir, "..", "..")
+        self.ressources_dir = os.path.normpath(
+            os.path.join(base_dir, "gui", "ressources")
+        )
+
         # Configuration of flags for rounded corners and remove title bar and buttons
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
 
@@ -95,7 +102,7 @@ class AboutDialog(QDialog):
         close_button = QLabel(self)
         if self.dark_theme == "dark":
             close_button.setPixmap(
-                QPixmap("gui/ressources/close_white.png").scaled(
+                QPixmap(os.path.join(self.ressources_dir, "close_white.png")).scaled(
                     40,
                     40,
                     Qt.AspectRatioMode.KeepAspectRatio,
@@ -104,7 +111,7 @@ class AboutDialog(QDialog):
             )
         else:
             close_button.setPixmap(
-                QPixmap("gui/ressources/close.png").scaled(
+                QPixmap(os.path.join(self.ressources_dir, "close.png")).scaled(
                     40,
                     40,
                     Qt.AspectRatioMode.KeepAspectRatio,
@@ -147,7 +154,7 @@ class AboutDialog(QDialog):
         # Header with the logo of PowDroid and the subtitle "Android Energy Profiler"
         logo_label = QLabel()
         logo_label.setPixmap(
-            QPixmap("gui/ressources/PowDroid_Vertical.png").scaled(
+            QPixmap(os.path.join(self.ressources_dir, "PowDroid_Vertical.png")).scaled(
                 497,
                 90,
                 Qt.AspectRatioMode.KeepAspectRatio,
@@ -204,7 +211,7 @@ class AboutDialog(QDialog):
 
         # Button with the GitHub logo and a title that opens the GitHub page of PowDroid when clicked
         github_button = QPushButton(t("about.github_repo", language=self.language))
-        github_button.setIcon(QIcon("gui/ressources/github.png"))
+        github_button.setIcon(QIcon(os.path.join(self.ressources_dir, "github.png")))
         github_button.setIconSize(QSize(40, 40))
         if self.dark_theme == "dark":
             github_button.setStyleSheet(
