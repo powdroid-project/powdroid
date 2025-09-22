@@ -91,14 +91,24 @@ def generate_outputs(
         csv_path = csv.process_csv_file(start_ts, stop_ts)
 
     if "csv" in output_formats:
-        print(f"[PowDroid] CSV file generated successfully: {csv_path}")
+        if csv_path:
+            print(f"[PowDroid] CSV file generated successfully: {csv_path}")
+        else:
+            print(
+                "[PowDroid] ERROR | No CSV file generated (check timestamps and data)"
+            )
 
     if "html" in output_formats:
-        html_content = html.process_html_file(csv_path)
-        html_path = csv_path.rsplit(".", 1)[0] + ".html"
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(html_content)
-        print(f"[PowDroid] HTML file generated successfully: {html_path}")
+        if csv_path:
+            html_content = html.process_html_file(csv_path)
+            html_path = csv_path.rsplit(".", 1)[0] + ".html"
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(html_content)
+            print(f"[PowDroid] HTML file generated successfully: {html_path}")
+        else:
+            print(
+                "[PowDroid] ERROR | Cannot generate HTML file because CSV is missing."
+            )
 
 
 def main(output_formats, verbose):
