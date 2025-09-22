@@ -7,8 +7,7 @@ Simply test your application for a few minutes to generate a machine-ready outpu
 
 Install the following dependencies:
 - [Android SDK platform tools](https://developer.android.com/studio/releases/platform-tools)
-- [Python 3.x](https://www.python.org/downloads/)
-- [Pandas module](https://pypi.org/project/pandas/)
+- [Python 3.x](https://www.python.org/downloads/) + Pandas + matplotlib + PyQT6
 - [GO runtime](https://go.dev/dl/)
 
 ⚠️ Then you must add command ```adb``` to your environment PATH (python and go should already be in the path, if not add them like adb):
