@@ -228,10 +228,29 @@ class RecordDialog(QDialog):
         if hasattr(self, "loading_movie") and self.loading_movie:
             self.loading_movie.stop()
 
+        # If no CSV was generated, show error message
+        if not hasattr(self, "csv_generated") or not self.worker or not hasattr(self.worker, "csv_generated"):
+            self._show_error_message("No data found. Please check your timestamps or battery stats.")
+
         self.recording_finished.emit()
 
         self.worker.deleteLater()
         self.worker = None
+
+    def _show_error_message(self, message):
+        """Display an error message in the UI when data collection fails."""
+        error_label = QLabel(message)
+        error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        error_label.setWordWrap(True)
+        error_label.setFont(QFont(self.font_family, 18, QFont.Weight.Bold))
+        if self.dark_theme == "dark":
+            error_label.setStyleSheet("color: #FF5555; margin: 30px 0;")
+        else:
+            error_label.setStyleSheet("color: #B00020; margin: 30px 0;")
+        content_layout = self.main_frame.layout()
+        content_layout.addWidget(error_label, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.update()
+        self.repaint()
 
     def _on_data_processing_error(self, error_message):
         """Called when there's an error during data processing."""
@@ -240,6 +259,8 @@ class RecordDialog(QDialog):
 
         if hasattr(self, "loading_movie") and self.loading_movie:
             self.loading_movie.stop()
+
+        self._show_error_message(f"Data processing error: {error_message}")
 
         self.recording_finished.emit()
 
