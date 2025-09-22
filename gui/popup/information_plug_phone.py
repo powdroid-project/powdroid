@@ -106,6 +106,12 @@ class InformationPopup(QDialog):
         self.plugged = plugged
         self.setModal(True)
         self.setFixedSize(356, 375)
+        # Initialisation du chemin absolu vers le dossier des ressources
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.join(current_dir, "..", "..")
+        self.ressources_dir = os.path.normpath(
+            os.path.join(base_dir, "gui", "ressources")
+        )
 
         # Device monitoring thread
         self.monitor_thread = None
@@ -142,7 +148,6 @@ class InformationPopup(QDialog):
     def on_device_disconnected(self):
         """Called when device is unplugged."""
         self.device_disconnected.emit()  # Emit signal to the outside
-        self.accept()  # Close popup
 
     def on_device_connected(self):
         """Called when device is plugged."""
@@ -188,8 +193,17 @@ class InformationPopup(QDialog):
         title_frame.setLayout(title_layout)
 
         picture_label = QLabel()
+        import os
+
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.join(current_dir, "..", "..")
+        self.ressources_dir = os.path.normpath(
+            os.path.join(base_dir, "gui", "ressources")
+        )
+        plug_phone_path = os.path.join(self.ressources_dir, "plug_the_phone.png")
         picture_label.setPixmap(
-            QPixmap("gui/ressources/plug_the_phone.png").scaled(
+            QPixmap(plug_phone_path).scaled(
                 184,
                 184,
                 Qt.AspectRatioMode.KeepAspectRatio,

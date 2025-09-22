@@ -52,6 +52,13 @@ class BatteryReportCanvas(FigureCanvas):
         self.parent_dialog = parent  # Store reference to parent dialog
         self.is_fullscreen = is_fullscreen  # Flag to disable clicks in fullscreen
 
+        # Initialisation du chemin absolu vers le dossier des ressources
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.join(current_dir, "..", "..")
+        self.ressources_dir = os.path.normpath(
+            os.path.join(base_dir, "gui", "ressources")
+        )
+
         FigureCanvas.setSizePolicy(
             self, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
@@ -464,9 +471,9 @@ class BatteryReportDialog(QDialog):
     def update_theme_button_icon(self):
         """Update the theme button icon based on the current theme."""
         if self.dark_theme == "dark":
-            icon_path = "gui/ressources/light.png"
+            icon_path = os.path.join(self.ressources_dir, "light.png")
         else:
-            icon_path = "gui/ressources/dark.png"
+            icon_path = os.path.join(self.ressources_dir, "dark.png")
 
         if os.path.exists(icon_path):
             self.theme_button.setPixmap(
@@ -486,9 +493,9 @@ class BatteryReportDialog(QDialog):
         self.update_theme_button_icon()
 
         if self.dark_theme == "dark":
-            close_icon_path = "gui/ressources/close_white.png"
+            close_icon_path = os.path.join(self.ressources_dir, "close_white.png")
         else:
-            close_icon_path = "gui/ressources/close.png"
+            close_icon_path = os.path.join(self.ressources_dir, "close.png")
 
         header_layout = self.main_frame.layout().itemAt(0).layout()
         close_button = header_layout.itemAt(2).widget()
@@ -610,7 +617,7 @@ class BatteryReportDialog(QDialog):
         close_button = QLabel(self)
         if self.dark_theme == "dark":
             close_button.setPixmap(
-                QPixmap("gui/ressources/close_white.png").scaled(
+                QPixmap(os.path.join(self.ressources_dir, "close_white.png")).scaled(
                     40,
                     40,
                     Qt.AspectRatioMode.KeepAspectRatio,
@@ -619,7 +626,7 @@ class BatteryReportDialog(QDialog):
             )
         else:
             close_button.setPixmap(
-                QPixmap("gui/ressources/close.png").scaled(
+                QPixmap(os.path.join(self.ressources_dir, "close.png")).scaled(
                     40,
                     40,
                     Qt.AspectRatioMode.KeepAspectRatio,
@@ -642,7 +649,7 @@ class BatteryReportDialog(QDialog):
 
         logo_label = QLabel()
         logo_label.setPixmap(
-            QPixmap("gui/ressources/PowDroid_Vertical.png").scaled(
+            QPixmap(os.path.join(self.ressources_dir, "PowDroid_Vertical.png")).scaled(
                 497,
                 90,
                 Qt.AspectRatioMode.KeepAspectRatio,

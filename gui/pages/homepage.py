@@ -131,6 +131,13 @@ class MainDialog(QDialog):
 
         self.load_fonts()
 
+        # Initialisation du chemin absolu vers le dossier des ressources
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.join(current_dir, "..", "..")
+        self.ressources_dir = os.path.normpath(
+            os.path.join(base_dir, "gui", "ressources")
+        )
+
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
@@ -215,7 +222,7 @@ class MainDialog(QDialog):
         close_button = QLabel(self)
         if self.dark_theme == "dark":
             close_button.setPixmap(
-                QPixmap("gui/ressources/close_white.png").scaled(
+                QPixmap(os.path.join(self.ressources_dir, "close_white.png")).scaled(
                     40,
                     40,
                     Qt.AspectRatioMode.KeepAspectRatio,
@@ -224,7 +231,7 @@ class MainDialog(QDialog):
             )
         else:
             close_button.setPixmap(
-                QPixmap("gui/ressources/close.png").scaled(
+                QPixmap(os.path.join(self.ressources_dir, "close.png")).scaled(
                     40,
                     40,
                     Qt.AspectRatioMode.KeepAspectRatio,
@@ -245,7 +252,7 @@ class MainDialog(QDialog):
 
         logo_label = QLabel()
         logo_label.setPixmap(
-            QPixmap("gui/ressources/PowDroid_Vertical.png").scaled(
+            QPixmap(os.path.join(self.ressources_dir, "PowDroid_Vertical.png")).scaled(
                 497,
                 90,
                 Qt.AspectRatioMode.KeepAspectRatio,
@@ -330,7 +337,9 @@ class MainDialog(QDialog):
         title_frame.setLayout(title_layout)
 
         self.record_button = QPushButton(t("homepage.record_button"))
-        self.record_button.setIcon(QIcon("gui/ressources/record.png"))
+        self.record_button.setIcon(
+            QIcon(os.path.join(self.ressources_dir, "record.png"))
+        )
         self.record_button.setIconSize(QSize(60, 60))
         self.update_record_button_style()
         self.record_button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -385,10 +394,14 @@ class MainDialog(QDialog):
         """Update the theme button icon based on the current theme."""
         if self.dark_theme == "dark":
             # In dark theme, show light theme icon (suggesting switch to light)
-            icon_path = "gui/ressources/light.png"  # You can replace with a specific light theme icon
+            icon_path = os.path.join(
+                self.ressources_dir, "light.png"
+            )  # You can replace with a specific light theme icon
         else:
             # In light theme, show dark theme icon (suggesting switch to dark)
-            icon_path = "gui/ressources/dark.png"  # You can replace with a specific dark theme icon
+            icon_path = os.path.join(
+                self.ressources_dir, "dark.png"
+            )  # You can replace with a specific dark theme icon
 
         if os.path.exists(icon_path):
             self.theme_button.setPixmap(
@@ -408,9 +421,9 @@ class MainDialog(QDialog):
         self.update_theme_button_icon()  # Update theme button icon
 
         if self.dark_theme == "dark":
-            close_icon_path = "gui/ressources/close_white.png"
+            close_icon_path = os.path.join(self.ressources_dir, "close_white.png")
         else:
-            close_icon_path = "gui/ressources/close.png"
+            close_icon_path = os.path.join(self.ressources_dir, "close.png")
 
         header_layout = self.main_frame.layout().itemAt(0).layout()
         close_button = header_layout.itemAt(2).widget()
@@ -524,33 +537,21 @@ class MainDialog(QDialog):
             phone_detected: True if a phone is detected, False otherwise
         """
         if phone_detected:
-            if self.dark_theme == "dark":
-                phone_icon_path = "gui/ressources/phone_plugged.png"
-            else:
-                phone_icon_path = "gui/ressources/phone_plugged.png"
-
+            phone_icon_path = os.path.join(self.ressources_dir, "phone_plugged.png")
             status_text = t("homepage.phone_status.connected")
-
             device_info = adb_runner.get_device_info()
             if device_info:
                 manufacturer = device_info.get("manufacturer", "Unknown")
                 model = device_info.get("model", "Unknown")
                 android_version = device_info.get("android_version", "Unknown")
-
                 self.phone_model_label.setText(f"{manufacturer} {model}")
                 self.phone_version_label.setText(f"Android {android_version}")
             else:
                 self.phone_model_label.setText("")
                 self.phone_version_label.setText("")
-
         else:
-            if self.dark_theme == "dark":
-                phone_icon_path = "gui/ressources/plug_the_phone.png"
-            else:
-                phone_icon_path = "gui/ressources/plug_the_phone.png"
-
+            phone_icon_path = os.path.join(self.ressources_dir, "plug_the_phone.png")
             status_text = t("homepage.phone_status.disconnected")
-
             self.phone_model_label.setText("")
             self.phone_version_label.setText("")
 
@@ -583,10 +584,10 @@ class MainDialog(QDialog):
             return
 
         adb_runner.kill_all()
-        
+
         # Clear battery stats while device is still connected
         adb_runner.clear_batterystats(verbose=True)
-        
+
         self.popup = InformationPopup(
             parent=self,
             plugged=True,

@@ -77,14 +77,14 @@ class CheckConfigDialog(QDialog):
 
         icon_label = QLabel()
         if success is None:
-            movie = QMovie("gui/ressources/loading.gif")
+            movie = QMovie(os.path.join(self.ressources_dir, "loading.gif"))
             movie.setScaledSize(QSize(41, 41))
             icon_label.setMovie(movie)
             movie.start()
             movie.setSpeed(100)
         elif success:
             icon_label.setPixmap(
-                QPixmap("gui/ressources/check.png").scaled(
+                QPixmap(os.path.join(self.ressources_dir, "check.png")).scaled(
                     41,
                     41,
                     Qt.AspectRatioMode.KeepAspectRatio,
@@ -93,7 +93,7 @@ class CheckConfigDialog(QDialog):
             )
         else:
             icon_label.setPixmap(
-                QPixmap("gui/ressources/remove.png").scaled(
+                QPixmap(os.path.join(self.ressources_dir, "remove.png")).scaled(
                     41,
                     41,
                     Qt.AspectRatioMode.KeepAspectRatio,
@@ -127,6 +127,13 @@ class CheckConfigDialog(QDialog):
         self.language = language
         self.setModal(True)
         self.setFixedSize(550, 573)
+
+        # Initialisation du chemin absolu vers le dossier des ressources
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.join(current_dir, "..", "..")
+        self.ressources_dir = os.path.normpath(
+            os.path.join(base_dir, "gui", "ressources")
+        )
 
         self.checks_config = [
             (t("check_config.android_sdk", language=self.language), check_android_sdk),
@@ -175,7 +182,7 @@ class CheckConfigDialog(QDialog):
         close_button = QLabel(self)
         if self.dark_theme == "dark":
             close_button.setPixmap(
-                QPixmap("gui/ressources/close_white.png").scaled(
+                QPixmap(os.path.join(self.ressources_dir, "close_white.png")).scaled(
                     40,
                     40,
                     Qt.AspectRatioMode.KeepAspectRatio,
@@ -184,7 +191,7 @@ class CheckConfigDialog(QDialog):
             )
         else:
             close_button.setPixmap(
-                QPixmap("gui/ressources/close.png").scaled(
+                QPixmap(os.path.join(self.ressources_dir, "close.png")).scaled(
                     40,
                     40,
                     Qt.AspectRatioMode.KeepAspectRatio,
@@ -224,7 +231,7 @@ class CheckConfigDialog(QDialog):
 
         logo_label = QLabel()
         logo_label.setPixmap(
-            QPixmap("gui/ressources/PowDroid_Vertical.png").scaled(
+            QPixmap(os.path.join(self.ressources_dir, "PowDroid_Vertical.png")).scaled(
                 497,
                 90,
                 Qt.AspectRatioMode.KeepAspectRatio,
