@@ -25,21 +25,24 @@ class AboutDialog(QDialog):
 
     def load_fonts(self):
         """Loads custom fonts from the fonts folder."""
-        # Get the absolute path of the current script
         current_dir = os.path.dirname(os.path.abspath(__file__))
         base_dir = os.path.join(current_dir, "..", "..")
+        self.ressources_dir = os.path.normpath(
+            os.path.join(base_dir, "gui", "ressources")
+        )
+
+
+        base_dir = os.path.join(current_dir, "..", "..")
         font_paths = [
-            os.path.join(base_dir, "gui", "ressources", "fonts", "Inter.ttf"),
-            os.path.join(base_dir, "gui", "ressources", "fonts", "Inter-Italic.ttf"),
+            os.path.join(os.path.dirname(__file__), "fonts", "Inter.ttf"),
+            os.path.join(os.path.dirname(__file__), "fonts", "Inter-Italic.ttf"),
         ]
 
-        self.font_family = "Arial"  # Fallback font
+        self.font_family = "Arial"
 
         for font_path in font_paths:
-            # Normalize the path
             font_path = os.path.normpath(font_path)
 
-            # Check if the file exists
             if not os.path.exists(font_path):
                 continue
 
@@ -49,6 +52,7 @@ class AboutDialog(QDialog):
                 if families:
                     self.font_family = families[0]
                     break
+
 
     def __init__(
         self, parent: Optional[QWidget] = None, dark_theme="dark", language="en"

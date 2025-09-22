@@ -47,9 +47,15 @@ class CheckConfigDialog(QDialog):
         """Loads custom fonts from the fonts folder."""
         current_dir = os.path.dirname(os.path.abspath(__file__))
         base_dir = os.path.join(current_dir, "..", "..")
+        self.ressources_dir = os.path.normpath(
+            os.path.join(base_dir, "gui", "ressources")
+        )
+
+
+        base_dir = os.path.join(current_dir, "..", "..")
         font_paths = [
-            os.path.join(base_dir, "gui", "ressources", "fonts", "Inter.ttf"),
-            os.path.join(base_dir, "gui", "ressources", "fonts", "Inter-Italic.ttf"),
+            os.path.join(os.path.dirname(__file__), "fonts", "Inter.ttf"),
+            os.path.join(os.path.dirname(__file__), "fonts", "Inter-Italic.ttf"),
         ]
 
         self.font_family = "Arial"
@@ -136,7 +142,6 @@ class CheckConfigDialog(QDialog):
         )
 
         self.checks_config = [
-            (t("check_config.android_sdk", language=self.language), check_android_sdk),
             (
                 t("check_config.python_version", language=self.language),
                 check_python_version,
