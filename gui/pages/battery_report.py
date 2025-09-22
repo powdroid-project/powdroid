@@ -33,6 +33,14 @@ import matplotlib.dates as mdates
 
 
 class BatteryReportCanvas(FigureCanvas):
+    def enterEvent(self, event):
+        from PyQt6.QtGui import QCursor
+        self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.unsetCursor()
+        super().leaveEvent(event)
     """Custom matplotlib canvas for cumulative energy graph"""
 
     def __init__(
@@ -107,14 +115,14 @@ class BatteryReportCanvas(FigureCanvas):
         """Get colors based on current theme"""
         if self.dark_theme == "dark":
             return {
-                "line_color": "#5374C9",
+                "line_color": "#FF6B6B",
                 "text_color": "white",
                 "grid_color": "white",
                 "background_color": "#2b2b2b",
             }
         else:
             return {
-                "line_color": "#2E4BC6",
+                "line_color": "#D63384",
                 "text_color": "black",
                 "grid_color": "gray",
                 "background_color": "#f5f5f5",
@@ -149,7 +157,7 @@ class BatteryReportCanvas(FigureCanvas):
                 color=colors["text_color"],
                 pad=20,
             )
-            ax.set_xlabel("Time", fontsize=12, color=colors["text_color"])
+            ax.set_xlabel("Elapsed Time (s)", fontsize=12, color=colors["text_color"])
             ax.set_ylabel(
                 "Cumulative Energy (J)", fontsize=12, color=colors["text_color"]
             )
@@ -165,7 +173,7 @@ class BatteryReportCanvas(FigureCanvas):
             self.figure.tight_layout(pad=1.0)
 
             # Additional adjustment for better fit
-            self.figure.subplots_adjust(left=0.1, right=0.95, top=0.9, bottom=0.15)
+            self.figure.subplots_adjust(left=0.1, right=0.95, top=0.9, bottom=0.22)
 
             self.draw()
 
@@ -189,6 +197,14 @@ class BatteryReportCanvas(FigureCanvas):
 
 
 class EnergyCanvas(FigureCanvas):
+    def enterEvent(self, event):
+        from PyQt6.QtGui import QCursor
+        self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.unsetCursor()
+        super().leaveEvent(event)
     """Custom matplotlib canvas for normal energy graph"""
 
     def __init__(
@@ -292,9 +308,9 @@ class EnergyCanvas(FigureCanvas):
             )
 
             ax.set_title(
-                "Energy Consumption", fontsize=16, color=colors["text_color"], pad=20
+                "Energy Consumption over time", fontsize=16, color=colors["text_color"], pad=20
             )
-            ax.set_xlabel("Time", fontsize=12, color=colors["text_color"])
+            ax.set_xlabel("Elapsed Time (s)", fontsize=12, color=colors["text_color"])
             ax.set_ylabel("Energy (J)", fontsize=12, color=colors["text_color"])
             ax.grid(True, alpha=0.3, color=colors["grid_color"])
             ax.tick_params(colors=colors["text_color"])
@@ -308,7 +324,7 @@ class EnergyCanvas(FigureCanvas):
             self.figure.tight_layout(pad=1.0)
 
             # Additional adjustment for better fit
-            self.figure.subplots_adjust(left=0.1, right=0.95, top=0.9, bottom=0.15)
+            self.figure.subplots_adjust(left=0.1, right=0.95, top=0.9, bottom=0.22)
 
             self.draw()
 
@@ -405,9 +421,15 @@ class BatteryReportDialog(QDialog):
         """Loads custom fonts from the fonts folder."""
         current_dir = os.path.dirname(os.path.abspath(__file__))
         base_dir = os.path.join(current_dir, "..", "..")
+        self.ressources_dir = os.path.normpath(
+            os.path.join(base_dir, "gui", "ressources")
+        )
+
+
+        base_dir = os.path.join(current_dir, "..", "..")
         font_paths = [
-            os.path.join(base_dir, "gui", "ressources", "fonts", "Inter.ttf"),
-            os.path.join(base_dir, "gui", "ressources", "fonts", "Inter-Italic.ttf"),
+            os.path.join(os.path.dirname(__file__), "fonts", "Inter.ttf"),
+            os.path.join(os.path.dirname(__file__), "fonts", "Inter-Italic.ttf"),
         ]
 
         self.font_family = "Arial"
@@ -424,6 +446,7 @@ class BatteryReportDialog(QDialog):
                 if families:
                     self.font_family = families[0]
                     break
+
 
     def show_about_page(self):
         """Show the about dialog."""
@@ -465,10 +488,9 @@ class BatteryReportDialog(QDialog):
             parent_dir = file_path.parent.name
             file_name = file_path.name
 
-            if parent_dir:
-                display_text = f"📁 {parent_dir}/{file_name}"
-            else:
-                display_text = f"📁 {file_name}"
+            
+            display_text = '<span style="font-size:16px;">🔗</span> <span>Click here to see raw data</span>'
+            
 
             self.file_path_label.setText(display_text)
             self.file_path_label.show()
@@ -517,11 +539,7 @@ class BatteryReportDialog(QDialog):
                 )
             )
 
-        if hasattr(self, "title_label"):
-            if self.dark_theme == "dark":
-                self.title_label.setStyleSheet("color: #D2D2D2;")
-            else:
-                self.title_label.setStyleSheet("color: #000000;")
+  
 
         if hasattr(self, "energy_total_label"):
             if self.dark_theme == "dark":
@@ -735,13 +753,13 @@ class BatteryReportDialog(QDialog):
         )
         energy_layout.addWidget(self.energy_canvas)
 
-        self.tab_widget.addTab(energy_tab, "Energy")
+        self.tab_widget.addTab(energy_tab, "Energy Over Time")
 
         content_layout.addWidget(self.tab_widget)
 
         self.file_path_label = QLabel()
         self.file_path_label.setFont(QFont(self.font_family, 10))
-        self.file_path_label.setWordWrap(True)
+        self.file_path_label.setWordWrap(False)
         self.file_path_label.setCursor(Qt.CursorShape.PointingHandCursor)
         self.file_path_label.setToolTip(
             "Click to open the directory containing the file"
@@ -752,6 +770,55 @@ class BatteryReportDialog(QDialog):
 
         if self.dark_theme == "dark":
             self.file_path_label.setStyleSheet(
+                """
+                QLabel {
+                    color: #4FC3F7;
+                    background: none;
+                    border: none;
+                    font-style: italic;
+                    text-decoration: underline;
+                }
+                QLabel:hover {
+                    color: #82B1FF;
+                    text-decoration: underline;
+                }
+                """
+            )
+        else:
+            self.file_path_label.setStyleSheet(
+                """
+                QLabel {
+                    color: #1976D2;
+                    background: none;
+                    border: none;
+                    font-style: italic;
+                    text-decoration: underline;
+                }
+                QLabel:hover {
+                    color: #1565C0;
+                    text-decoration: underline;
+                }
+                """
+            )
+
+        if not self.csv_file_path:
+            self.file_path_label.hide()
+        else:
+            self.update_file_path_label()
+
+        content_layout.addWidget(
+            self.file_path_label, alignment=Qt.AlignmentFlag.AlignCenter
+        )
+
+        # Energy total label
+
+        self.energy_total_label = QLabel("🔋⚡ Total Energy: -- J")
+        energy_total_font = QFont(self.font_family, 14, QFont.Weight.DemiBold)
+        self.energy_total_label.setFont(energy_total_font)
+        self.energy_total_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        if self.dark_theme == "dark":
+            self.energy_total_label.setStyleSheet(
                 """
                 QLabel {
                     color: #A0A0A0;
@@ -765,10 +832,10 @@ class BatteryReportDialog(QDialog):
                     background-color: #3C3C3C;
                     border: 1px solid #4C4C4C;
                 }
-            """
+                """
             )
         else:
-            self.file_path_label.setStyleSheet(
+            self.energy_total_label.setStyleSheet(
                 """
                 QLabel {
                     color: #666666;
@@ -782,29 +849,8 @@ class BatteryReportDialog(QDialog):
                     background-color: #E8E8E8;
                     border: 1px solid #CCCCCC;
                 }
-            """
+                """
             )
-
-        if not self.csv_file_path:
-            self.file_path_label.hide()
-        else:
-            self.update_file_path_label()
-
-        content_layout.addWidget(
-            self.file_path_label, alignment=Qt.AlignmentFlag.AlignCenter
-        )
-
-        # Energy total label
-        self.energy_total_label = QLabel("Energy total: -- J")
-        energy_total_font = QFont(self.font_family, 14, QFont.Weight.DemiBold)
-        self.energy_total_label.setFont(energy_total_font)
-        self.energy_total_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.energy_total_label.setStyleSheet("margin: 10px 0px;")
-
-        if self.dark_theme == "dark":
-            self.energy_total_label.setStyleSheet("color: #D2D2D2; margin: 10px 0px;")
-        else:
-            self.energy_total_label.setStyleSheet("color: #000000; margin: 10px 0px;")
 
         content_layout.addWidget(
             self.energy_total_label, alignment=Qt.AlignmentFlag.AlignCenter
@@ -995,7 +1041,7 @@ class BatteryReportDialog(QDialog):
             else:
                 formatted_energy = f"{total_energy:.2f} J"
 
-            self.energy_total_label.setText(f"Energy total: {formatted_energy}")
+            self.energy_total_label.setText(f"🔋⚡ Total energy: {formatted_energy}")
 
     def set_csv_file(self, csv_file_path):
         """Set the CSV file path and load data"""
@@ -1046,26 +1092,7 @@ class FullScreenGraphDialog(QDialog):
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(40, 40, 40, 40)
 
-        # Header with title only
-        header_layout = QHBoxLayout()
-
-        # Title
-        title_text = (
-            "Cumulative Energy Consumption"
-            if self.graph_type == "cumulative"
-            else "Energy Consumption"
-        )
-        self.title_label = QLabel(title_text)
-        title_font = QFont("Arial", 28, QFont.Weight.Bold)
-        self.title_label.setFont(title_font)
-        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        header_layout.addWidget(self.title_label)
-
-        main_layout.addLayout(header_layout)
-
-        # Add some spacing
-        main_layout.addSpacing(20)
+        # (Titre supprimé dans la boîte de dialogue plein écran)
 
         # Graph canvas
         if self.graph_type == "cumulative":

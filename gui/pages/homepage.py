@@ -166,12 +166,18 @@ class MainDialog(QDialog):
             event.accept()
 
     def load_fonts(self):
-        """Load custom fonts from the fonts folder."""
+        """Loads custom fonts from the fonts folder."""
         current_dir = os.path.dirname(os.path.abspath(__file__))
         base_dir = os.path.join(current_dir, "..", "..")
+        self.ressources_dir = os.path.normpath(
+            os.path.join(base_dir, "gui", "ressources")
+        )
+
+
+        base_dir = os.path.join(current_dir, "..", "..")
         font_paths = [
-            os.path.join(base_dir, "gui", "ressources", "fonts", "Inter.ttf"),
-            os.path.join(base_dir, "gui", "ressources", "fonts", "Inter-Italic.ttf"),
+            os.path.join(os.path.dirname(__file__), "fonts", "Inter.ttf"),
+            os.path.join(os.path.dirname(__file__), "fonts", "Inter-Italic.ttf"),
         ]
 
         self.font_family = "Arial"
@@ -188,6 +194,7 @@ class MainDialog(QDialog):
                 if families:
                     self.font_family = families[0]
                     break
+
 
     def show_about_page(self):
         dialog = AboutDialog(self, dark_theme=self.dark_theme, language=self.language)
