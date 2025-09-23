@@ -15,9 +15,11 @@ def handle_exit(signum, frame):
 def main():
     signal.signal(signal.SIGINT, handle_exit)
 
-    # Load version from .powdroid_config.json
+    # Load version from .powdroid_config.json, robust to working directory
     try:
-        with open(".powdroid_config.json", encoding="utf-8") as f:
+        base_dir = os.path.abspath(os.path.dirname(__file__))
+        config_path = os.path.join(base_dir, ".powdroid_config.json")
+        with open(config_path, encoding="utf-8") as f:
             config_data = json.load(f)
             version = config_data.get("version", "Unknown version")
     except Exception:

@@ -179,8 +179,10 @@ class AboutDialog(QDialog):
 
         # Label with the version of PowDroid aligned to the right
         try:
-            config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".powdroid_config.json")
-            with open(os.path.normpath(config_path), encoding="utf-8") as f:
+            # Find the absolute path to the config file based on the script location
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+            config_path = os.path.join(base_dir, ".powdroid_config.json")
+            with open(config_path, encoding="utf-8") as f:
                 config_data = json.load(f)
                 version_str = config_data.get("version", "Unknown version")
         except Exception:
