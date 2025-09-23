@@ -16,6 +16,7 @@ from PyQt6.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QFontDatabase
 from typing import Optional
 from gui.i18n import t
 import os
+import json
 
 
 class AboutDialog(QDialog):
@@ -177,7 +178,14 @@ class AboutDialog(QDialog):
         logo_layout.setContentsMargins(0, 0, 0, 0)
 
         # Label with the version of PowDroid aligned to the right
-        version_label = QLabel("Version " + t("version", language=self.language))
+        try:
+            config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".powdroid_config.json")
+            with open(os.path.normpath(config_path), encoding="utf-8") as f:
+                config_data = json.load(f)
+                version_str = config_data.get("version", "Unknown version")
+        except Exception:
+            version_str = "Unknown version"
+        version_label = QLabel(f"Version {version_str}")
         version_font = QFont(self.font_family, 16, QFont.Weight.Medium)
         version_label.setFont(version_font)
         if self.dark_theme == "dark":

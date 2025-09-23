@@ -15,12 +15,13 @@ def handle_exit(signum, frame):
 def main():
     signal.signal(signal.SIGINT, handle_exit)
 
+    # Load version from .powdroid_config.json
     try:
-        with open(os.path.join("gui", "languages", "en.json"), encoding="utf-8") as f:
-            lang_data = json.load(f)
-            version = lang_data.get("version", "Version inconnue")
+        with open(".powdroid_config.json", encoding="utf-8") as f:
+            config_data = json.load(f)
+            version = config_data.get("version", "Unknown version")
     except Exception:
-        version = "Version inconnue"
+        version = "Unknown version"
 
     class CustomArgumentParser(argparse.ArgumentParser):
         def error(self, message):
