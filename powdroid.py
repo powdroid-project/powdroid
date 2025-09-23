@@ -1,8 +1,10 @@
+
 import os
 import subprocess
 import sys
 import argparse
 import signal
+import json
 
 
 def handle_exit(signum, frame):
@@ -13,12 +15,21 @@ def handle_exit(signum, frame):
 def main():
     signal.signal(signal.SIGINT, handle_exit)
 
+    try:
+        with open(os.path.join("gui", "languages", "en.json"), encoding="utf-8") as f:
+            lang_data = json.load(f)
+            version = lang_data.get("version", "Version inconnue")
+    except Exception:
+        version = "Version inconnue"
+
     class CustomArgumentParser(argparse.ArgumentParser):
         def error(self, message):
             print(f"[Debug] ERROR | {message}. Use -h or --help for usage information.")
             sys.exit(2)
 
-    parser = CustomArgumentParser()
+    parser = CustomArgumentParser(
+        description=f"PowDroid CLI [{version}]"
+    )
     parser.add_argument(
         "-o",
         "--output",

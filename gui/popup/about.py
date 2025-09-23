@@ -177,7 +177,7 @@ class AboutDialog(QDialog):
         logo_layout.setContentsMargins(0, 0, 0, 0)
 
         # Label with the version of PowDroid aligned to the right
-        version_label = QLabel("v1.0")
+        version_label = QLabel(t("version", language=self.language))
         version_font = QFont(self.font_family, 16, QFont.Weight.Medium)
         version_label.setFont(version_font)
         if self.dark_theme == "dark":
