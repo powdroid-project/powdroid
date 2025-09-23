@@ -28,7 +28,7 @@ def main():
             sys.exit(2)
 
     parser = CustomArgumentParser(
-        description=f"PowDroid CLI [{version}]"
+        description=f"PowDroid CLI [Version {version}]"
     )
     parser.add_argument(
         "-o",
