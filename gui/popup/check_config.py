@@ -51,7 +51,6 @@ class CheckConfigDialog(QDialog):
             os.path.join(base_dir, "gui", "ressources")
         )
 
-
         base_dir = os.path.join(current_dir, "..", "..")
         font_paths = [
             os.path.join(os.path.dirname(__file__), "fonts", "Inter.ttf"),
@@ -134,7 +133,7 @@ class CheckConfigDialog(QDialog):
         self.setModal(True)
         self.setFixedSize(550, 573)
 
-        # Initialisation du chemin absolu vers le dossier des ressources
+        # Initialize the absolute path to the resources folder
         current_dir = os.path.dirname(os.path.abspath(__file__))
         base_dir = os.path.join(current_dir, "..", "..")
         self.ressources_dir = os.path.normpath(
@@ -277,13 +276,13 @@ class CheckConfigDialog(QDialog):
     def perform_next_check(self):
         """Perform the next configuration check."""
         if self.current_check >= len(self.checks_config):
-            # All checks completed
+            # All checks are finished
             if not self.has_failures:
-                # Only close if all checks passed
-                QTimer.singleShot(
-                    500, lambda: self.accept()
-                )  # Wait a bit then close with accepted status
-            # If there are failures, keep the dialog open
+                # Close if everything is OK
+                QTimer.singleShot(500, lambda: self.accept())
+            else:
+                # Show the error message if at least one check failed
+                self.show_failure_message()
             return
 
         check_name, check_function = self.checks_config[self.current_check]
@@ -292,6 +291,24 @@ class CheckConfigDialog(QDialog):
         self.current_worker.finished.connect(self.on_check_finished)
         self.current_worker.error.connect(self.on_check_error)
         self.current_worker.start()
+
+    def show_failure_message(self):
+        """Show an error message if a dependency is missing."""
+        # Check if the message already exists
+        if hasattr(self, "failure_label"):
+            return
+        self.failure_label = QLabel(
+            "PowDroid cannot start as at least one required dependency is missing. Please install/fix the missing dependencies, then try again."
+        )
+        self.failure_label.setWordWrap(True)
+        self.failure_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.failure_label.setFont(QFont(self.font_family, 16, QFont.Weight.Bold))
+        if self.dark_theme == "dark":
+            self.failure_label.setStyleSheet("color: #FF5555; margin-top: 20px;")
+        else:
+            self.failure_label.setStyleSheet("color: #B00020; margin-top: 20px;")
+        layout = self.main_frame.layout()
+        layout.addWidget(self.failure_label)
 
     def on_check_finished(self, check_name, check_result):
         """Handle completion of a check."""
