@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QToolButton,
     QScrollArea,
-    QSizePolicy,
 )
 from PyQt6.QtCore import (
     Qt,

@@ -9,10 +9,9 @@ from PyQt6.QtWidgets import (
     QLabel,
     QFrame,
     QWidget,
-    QPushButton,
 )
-from PyQt6.QtCore import Qt, QSize, QRect, QUrl, QThread, pyqtSignal
-from PyQt6.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QFontDatabase
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QFont, QPixmap, QFontDatabase
 from typing import Optional
 from gui.i18n import t
 from core.utils.adb_runner import wait_for_device_disconnection, is_device_connected
