@@ -9,10 +9,9 @@ from PyQt6.QtWidgets import (
     QLabel,
     QFrame,
     QWidget,
-    QPushButton,
 )
-from PyQt6.QtCore import Qt, QSize, QRect, QUrl, QTimer, QThread, pyqtSignal
-from PyQt6.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QFontDatabase, QMovie
+from PyQt6.QtCore import Qt, QSize, QTimer, QThread, pyqtSignal
+from PyQt6.QtGui import QFont, QPixmap, QFontDatabase, QMovie
 from typing import Optional
 from core.utils.setup import *
 from gui.i18n import t
@@ -146,7 +145,7 @@ class CheckConfigDialog(QDialog):
                 check_python_version,
             ),
             (
-                t("check_config.pandas_library", language=self.language),
+                "Python Libraries",
                 check_pandas_module,
             ),
             (

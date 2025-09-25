@@ -372,7 +372,7 @@ class RecordDialog(QDialog):
 
         spinner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        message_label = QLabel("Please wait. It may take a while.")
+        message_label = QLabel("Please wait.\nIt may take a while.")
         message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         message_font = QFont(self.font_family, 32, QFont.Weight.DemiBold)
         message_font.setItalic(True)

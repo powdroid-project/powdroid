@@ -7,8 +7,6 @@ import json
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from gui.popup.information_plug_phone import InformationPopup
-from gui.popup.about import AboutDialog
 from gui.popup.check_config import CheckConfigDialog
 from gui.pages.homepage import MainDialog
 
@@ -32,8 +30,6 @@ def load_config():
 def main():
     """Main function for the GUI interface"""
     from PyQt6.QtWidgets import QApplication, QDialog
-    from PyQt6.QtCore import QTimer
-    import time
 
     app = QApplication(sys.argv)
 

@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QApplication,
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QPixmap, QFontDatabase
 from typing import Optional
 import matplotlib
@@ -35,12 +35,14 @@ import matplotlib.dates as mdates
 class BatteryReportCanvas(FigureCanvas):
     def enterEvent(self, event):
         from PyQt6.QtGui import QCursor
+
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         self.unsetCursor()
         super().leaveEvent(event)
+
     """Custom matplotlib canvas for cumulative energy graph"""
 
     def __init__(
@@ -199,12 +201,14 @@ class BatteryReportCanvas(FigureCanvas):
 class EnergyCanvas(FigureCanvas):
     def enterEvent(self, event):
         from PyQt6.QtGui import QCursor
+
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         self.unsetCursor()
         super().leaveEvent(event)
+
     """Custom matplotlib canvas for normal energy graph"""
 
     def __init__(
@@ -308,7 +312,10 @@ class EnergyCanvas(FigureCanvas):
             )
 
             ax.set_title(
-                "Energy Consumption over time", fontsize=16, color=colors["text_color"], pad=20
+                "Energy Consumption over time",
+                fontsize=16,
+                color=colors["text_color"],
+                pad=20,
             )
             ax.set_xlabel("Elapsed Time (s)", fontsize=12, color=colors["text_color"])
             ax.set_ylabel("Energy (J)", fontsize=12, color=colors["text_color"])
@@ -425,7 +432,6 @@ class BatteryReportDialog(QDialog):
             os.path.join(base_dir, "gui", "ressources")
         )
 
-
         base_dir = os.path.join(current_dir, "..", "..")
         font_paths = [
             os.path.join(os.path.dirname(__file__), "fonts", "Inter.ttf"),
@@ -446,7 +452,6 @@ class BatteryReportDialog(QDialog):
                 if families:
                     self.font_family = families[0]
                     break
-
 
     def show_about_page(self):
         """Show the about dialog."""
@@ -488,9 +493,7 @@ class BatteryReportDialog(QDialog):
             parent_dir = file_path.parent.name
             file_name = file_path.name
 
-            
-            display_text = '<span style="font-size:16px;">🔗</span> <span>Click here to see raw data</span>'
-            
+            display_text = '<span style="text-decoration:none;"><span style="font-size:16px;">🔗</span></span> <span style="text-decoration:underline; font-style:italic;">Click here to see raw data</span>'
 
             self.file_path_label.setText(display_text)
             self.file_path_label.show()
@@ -538,8 +541,6 @@ class BatteryReportDialog(QDialog):
                     Qt.TransformationMode.SmoothTransformation,
                 )
             )
-
-  
 
         if hasattr(self, "energy_total_label"):
             if self.dark_theme == "dark":

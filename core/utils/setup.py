@@ -85,6 +85,8 @@ def check_pandas_module() -> CheckResult:
     """Vérifie la disponibilité du module Pandas"""
     try:
         import pandas
+        import matplotlib
+        import PyQt6
 
         return CheckResult(success=True, message="The Pandas module is installed.")
     except ImportError:

@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QPushButton,
 )
-from PyQt6.QtCore import Qt, QSize, QRect, QUrl
+from PyQt6.QtCore import Qt, QSize, QUrl
 from PyQt6.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QFontDatabase
 from typing import Optional
 from gui.i18n import t
@@ -31,7 +31,6 @@ class AboutDialog(QDialog):
         self.ressources_dir = os.path.normpath(
             os.path.join(base_dir, "gui", "ressources")
         )
-
 
         base_dir = os.path.join(current_dir, "..", "..")
         font_paths = [
@@ -54,7 +53,6 @@ class AboutDialog(QDialog):
                     self.font_family = families[0]
                     break
 
-
     def __init__(
         self, parent: Optional[QWidget] = None, dark_theme="dark", language="en"
     ):
@@ -72,7 +70,6 @@ class AboutDialog(QDialog):
 
         self.load_fonts()
 
-        # Initialisation du chemin absolu vers le dossier des ressources
         current_dir = os.path.dirname(os.path.abspath(__file__))
         base_dir = os.path.join(current_dir, "..", "..")
         self.ressources_dir = os.path.normpath(
@@ -167,20 +164,16 @@ class AboutDialog(QDialog):
             )
         )
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # subtitle_label = QLabel("Android Energy Profiler")
-        # subtitle_font = QFont(self.font_family, 24, QFont.Weight.Normal)
-        # subtitle_label.setFont(subtitle_font)
-        # subtitle_label.setStyleSheet("color: #57C18B;")
-        # subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         logo_layout = QVBoxLayout()
         logo_layout.addWidget(logo_label)
-        # logo_layout.addWidget(subtitle_label)
         logo_layout.setContentsMargins(0, 0, 0, 0)
 
         # Label with the version of PowDroid aligned to the right
         try:
             # Find the absolute path to the config file based on the script location
-            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+            base_dir = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "..")
+            )
             config_path = os.path.join(base_dir, ".powdroid_config.json")
             with open(config_path, encoding="utf-8") as f:
                 config_data = json.load(f)
@@ -200,7 +193,7 @@ class AboutDialog(QDialog):
 
         # Label for the description of PowDroid application
         description_label = QLabel(t("about.description", language=self.language))
-        description_font = QFont(self.font_family, 20, QFont.Weight.Medium)
+        description_font = QFont(self.font_family, 16, QFont.Weight.Medium)
         description_label.setFont(description_font)
         if self.dark_theme == "dark":
             description_label.setStyleSheet("color: #D2D2D2;")
@@ -212,7 +205,7 @@ class AboutDialog(QDialog):
 
         # Label for the license of PowDroid
         license_label = QLabel(t("about.license", language=self.language))
-        license_font = QFont(self.font_family, 20)
+        license_font = QFont(self.font_family, 16)
         license_font.setItalic(True)
         license_label.setFont(license_font)
         if self.dark_theme == "dark":
