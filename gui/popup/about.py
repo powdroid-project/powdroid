@@ -193,7 +193,7 @@ class AboutDialog(QDialog):
 
         # Label for the description of PowDroid application
         description_label = QLabel(t("about.description", language=self.language))
-        description_font = QFont(self.font_family, 20, QFont.Weight.Medium)
+        description_font = QFont(self.font_family, 16, QFont.Weight.Medium)
         description_label.setFont(description_font)
         if self.dark_theme == "dark":
             description_label.setStyleSheet("color: #D2D2D2;")
@@ -205,7 +205,7 @@ class AboutDialog(QDialog):
 
         # Label for the license of PowDroid
         license_label = QLabel(t("about.license", language=self.language))
-        license_font = QFont(self.font_family, 20)
+        license_font = QFont(self.font_family, 16)
         license_font.setItalic(True)
         license_label.setFont(license_font)
         if self.dark_theme == "dark":

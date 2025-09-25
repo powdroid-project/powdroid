@@ -361,7 +361,7 @@ class MainDialog(QDialog):
 
         instructions_content_layout = QVBoxLayout()
         instructions_label = QLabel(t("homepage.instructions.content"))
-        instructions_label.setFont(QFont(self.font_family, 20, QFont.Weight.Normal))
+        instructions_label.setFont(QFont(self.font_family, 16, QFont.Weight.Normal))
         instructions_label.setWordWrap(True)
 
         instructions_content_layout.addWidget(instructions_label)
