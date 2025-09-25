@@ -103,21 +103,17 @@ def check_gui_modules() -> CheckResult:
     except ImportError:
         missing_modules.append("matplotlib")
 
-    try:
-        import PyQt5
-    except ImportError:
-        missing_modules.append("PyQt5")
 
     if not missing_modules:
         return CheckResult(
             success=True,
-            message="GUI modules matplotlib and PyQt5 are installed.",
+            message="GUI modules matplotlib is installed.",
         )
     else:
         return CheckResult(
             success=False,
             message=f"GUI modules are not fully installed. Missing: {', '.join(missing_modules)}",
-            error="If you wish to use the GUI, run: pip install pandas matplotlib PyQt5",
+            error="If you wish to use the GUI, run: pip install pandas matplotlib",
         )
 
 
