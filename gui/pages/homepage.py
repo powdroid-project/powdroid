@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QToolButton,
     QScrollArea,
-    QApplication,
 )
 from PyQt6.QtCore import (
     Qt,
@@ -27,7 +26,6 @@ from gui.popup import *
 from gui.popup.information_plug_phone import InformationPopup
 from core.utils import adb_runner
 import os
-import platform
 
 from gui.popup.about import AboutDialog
 from gui.pages.record_page import RecordDialog
@@ -105,20 +103,6 @@ class CollapsibleBox(QFrame):
         self.content_widget.setLayout(layout)
 
 
-def get_scale_factor():
-    """Retourne le facteur de scaling selon l'OS et l'écran."""
-    # Pour Windows et Linux, PyQt gère le scaling DPI automatiquement si activé
-    # Pour macOS, le scaling est généralement 2.0 sur Retina, sinon 1.0
-    if platform.system() == "Darwin":
-        # macOS : pas de scaling manuel
-        return 1.0
-    else:
-        # Windows/Linux
-        app = QApplication.instance()
-        if app:
-            return app.devicePixelRatio()
-        return 1.0
-
 class MainDialog(QDialog):
     """
     "Main" frame.
@@ -137,12 +121,7 @@ class MainDialog(QDialog):
         self.dark_theme = dark_theme
         self.language = language
         self.setModal(True)
-
-        # Scaling selon l'OS
-        self.scale_factor = get_scale_factor()
-        base_width = 550
-        base_height = 900
-        self.setFixedSize(int(base_width * self.scale_factor), int(base_height * self.scale_factor))
+        self.setFixedSize(550, 900)
 
         self.previous_device_status = None
 
@@ -237,7 +216,7 @@ class MainDialog(QDialog):
 
         self.theme_button = QLabel(self)
         self.update_theme_button_icon()
-        self.theme_button.setFixedSize(int(40 * self.scale_factor), int(40 * self.scale_factor))
+        self.theme_button.setFixedSize(40, 40)
         self.theme_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.theme_button.setToolTip("Toggle Dark/Light Theme")
 
@@ -265,7 +244,7 @@ class MainDialog(QDialog):
                     Qt.TransformationMode.SmoothTransformation,
                 )
             )
-        close_button.setFixedSize(int(40 * self.scale_factor), int(40 * self.scale_factor))
+        close_button.setFixedSize(40, 40)
         close_button.setCursor(Qt.CursorShape.PointingHandCursor)
 
         def close_dialog(event):
@@ -280,8 +259,8 @@ class MainDialog(QDialog):
         logo_label = QLabel()
         logo_label.setPixmap(
             QPixmap(os.path.join(self.ressources_dir, "PowDroid_Vertical.png")).scaled(
-                int(497 * self.scale_factor),
-                int(90 * self.scale_factor),
+                497,
+                90,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
@@ -303,14 +282,14 @@ class MainDialog(QDialog):
             title_frame.setStyleSheet(
                 "background-color: #EEEEEE; border: 1px solid #D9D9D9; border-radius: 8px;"
             )
-        title_frame.setFixedSize(int(499 * self.scale_factor), int(207 * self.scale_factor))
+        title_frame.setFixedSize(499, 207)
 
         title_layout = QHBoxLayout()
         title_layout.setContentsMargins(15, 15, 15, 15)
         title_layout.setSpacing(15)
 
         self.phone_image = QLabel()
-        self.phone_image.setFixedSize(int(184 * self.scale_factor), int(184 * self.scale_factor))
+        self.phone_image.setFixedSize(184, 184)
         self.phone_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.phone_image.setStyleSheet("border: none;")
 
@@ -372,10 +351,10 @@ class MainDialog(QDialog):
         self.record_button.setCursor(Qt.CursorShape.PointingHandCursor)
         github_font = QFont(self.font_family, 24, QFont.Weight.DemiBold)
         self.record_button.setFont(github_font)
-        self.record_button.setFixedSize(int(499 * self.scale_factor), int(100 * self.scale_factor))
+        self.record_button.setFixedSize(499, 100)
         self.record_button.clicked.connect(self.show_record_page)
 
-        instructions_group = CollapsibleBox("Instructions", content_size=(int(499 * self.scale_factor), int(216 * self.scale_factor)))
+        instructions_group = CollapsibleBox("Instructions", content_size=(499, 216))
         instructions_group.toggle_button.setFont(
             QFont(self.font_family, 24, QFont.Weight.DemiBold)
         )
