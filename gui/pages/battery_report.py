@@ -493,7 +493,7 @@ class BatteryReportDialog(QDialog):
             parent_dir = file_path.parent.name
             file_name = file_path.name
 
-            display_text = '<span style="font-size:16px;">🔗</span> <span style="text-decoration:underline; font-style:italic;">Click here to see raw data</span>'
+            display_text = '<span style="text-decoration:none;"><span style="font-size:16px;">🔗</span></span> <span style="text-decoration:underline; font-style:italic;">Click here to see raw data</span>'
 
             self.file_path_label.setText(display_text)
             self.file_path_label.show()
