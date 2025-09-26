@@ -1,32 +1,54 @@
-from core.utils import page_manager as pm
-from core.utils import sidebar_manager as sm
+import sys
+import os
+import json
 
-from pathlib import Path
-import ttkbootstrap as tb
-from ttkbootstrap.constants import *
+
+# Add parent directory to PYTHONPATH for imports
+if __name__ == "__main__":
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from gui.popup.check_config import CheckConfigDialog
+from gui.pages.homepage import MainDialog
+
+
+def load_config():
+    """Load configuration from the .powdroid_config.json file"""
+    config_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        ".powdroid_config.json",
+    )
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+            return config.get("language", "en"), config.get(
+                "theme", "dark"
+            )  # 'en' default if no language
+    except (FileNotFoundError, json.JSONDecodeError):
+        return "en", "dark"  # Default language and theme if error
+
 
 def main():
-    app = tb.Window(themename="darkly")
-    app.title("PowDroid GUI")
+    """Main function for the GUI interface"""
+    from PyQt6.QtWidgets import QApplication, QDialog
 
-    ICO_DIR = Path(__file__).resolve().parent / "ressources"
-    try:
-        app.iconbitmap(ICO_DIR / "powdroid_logo.ico")
-    except Exception:
-        pass
+    app = QApplication(sys.argv)
 
-    app.state("zoomed")
+    current_language, current_theme = load_config()
+    print(f"Language loaded from config: {current_language}")
+    print(f"Theme loaded from config: {current_theme}")
 
-    # --- PAGE SYSTEM SETUP ---
-    pages = pm.create_pages(app)
+    # First show the configuration check dialog
+    checkConfig = CheckConfigDialog(dark_theme=current_theme, language=current_language)
 
-    # --- SIDEBAR ---
-    sm.setup_sidebar(app, pages, pm.show_page)
+    if checkConfig.exec() == QDialog.DialogCode.Accepted:
 
-    # --- SHOW HOME PAGE BY DEFAULT ---
-    pm.show_page(pages, "home")
+        # Then show the main dialog
+        main_dialog = MainDialog(dark_theme=current_theme, language=current_language)
+        main_dialog.show()
 
-    app.mainloop()
+        # Start the event loop
+        app.exec()
+    else:
+        sys.exit(1)
 
-if __name__ == "__main__":
-    main()
+    sys.exit(0)

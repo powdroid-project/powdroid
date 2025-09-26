@@ -1,15 +1,14 @@
-# PowDroid: A lightweight tool for measuring the energy footprint of any Android application
+![PowDroid logo](gui/ressources/PowDroid_Vertical.png)
 
-Powdroid is a command-line tool that profiles the energy consumption of Android apps.
+Powdroid is a lightweight tool that profiles the energy consumption of Android apps.
 Simply test your application for a few minutes to generate a machine-ready output file containing various energy-related metrics.
 
 ## 🔧 Setup
 
 Install the following dependencies:
-- Android SDK platform tools (https://developer.android.com/studio/releases/platform-tools)
-- Python 3.10 or below (https://www.python.org/downloads/)
-- Pandas module
-- GO runtime (https://go.dev/dl/)
+- [Android SDK platform tools](https://developer.android.com/studio/releases/platform-tools)
+- [Python 3.x](https://www.python.org/downloads/) + Pandas + matplotlib + PyQT6
+- [GO runtime](https://go.dev/dl/)
 
 ⚠️ Then you must add command ```adb``` to your environment PATH (python and go should already be in the path, if not add them like adb):
 - On Windows, edit the PATH environment variable in Advanced System Settings, then System Properties, then Environment Variables, and finally choose Path and edit it by adding the new path (the location where you installed platform-tools).
@@ -31,11 +30,13 @@ First, activate *USB Debugging* in your Android phone in *developer options*.
 To verify and facilitate the use of "PowDroid" it is advised to do the first "Handshake" between your phone and the computer by connecting the phone through USB to the computer and type in a command prompt or shell the following: `adb devices`.
 On your phone a prompt should appear asking for permission for debugging. If the computer is your personal computer and safe, you should check *Always allow from this computer*.
 
-### Running and Using PowDroid
+### Running and Using PowDroid (CLI or GUI)
 
-Just run `python powdroid.py -o csv` in your terminal and follow the on-screen instructions.
+- Command-line interface (CLI): just run `python /path/to/powdroid.py -o csv` in your terminal and follow the on-screen instructions.
 
 For more options, use the `--help` command.
+
+- Graphical interface (GUI): the GUI mode can be started by running Python without any arguments.
 
 ## 🤝 Contributors
 
@@ -43,7 +44,7 @@ The project is developed and maintained by:
 - Olivier Le Goaër
 - Adel Noureddine
 
-Previous contributors : Fares Bouaffar (initial author), Pierre-Antoine Larguet, Alex Striedelmeyer, Julien Desprez.
+Previous contributors : Fares Bouaffar (initial author), Pierre-Antoine Larguet, Alex Striedelmeyer, Julien Desprez, Nathan Lorit.
 PowDroid was first released on [our old university git repository here](https://git.univ-pau.fr/powdroid/powdroid), and on [our old gitlab repository here](https://gitlab.com/powdroid/powdroid-cli).
 
 ## 🔗 How to cite this work?

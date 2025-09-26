@@ -3,6 +3,7 @@ from core.utils import csv_handler as csv
 from core.utils import html_renderer as html
 from datetime import datetime
 
+
 def initialize_connection(verbose):
     print("[PowDroid Step 1/4] Initializing device connection...")
 
@@ -12,9 +13,14 @@ def initialize_connection(verbose):
         adb.wait_for_device_connection(verbose)
         connected_device = adb.get_connected_device()
     else:
-        print(f"[PowDroid] Device {connected_device} connected." if verbose else "[PowDroid] Device already connected.")
+        print(
+            f"[PowDroid] Device {connected_device} connected."
+            if verbose
+            else "[PowDroid] Device already connected."
+        )
     adb.kill_all()
     adb.clear_batterystats(verbose)
+
 
 def record_session(verbose):
     print("[PowDroid Step 2/4] Starting session recording...")
@@ -23,11 +29,15 @@ def record_session(verbose):
 
     input("=> Press ENTER to start recording your test session.")
     start_user_session = datetime.now()
-    print(f"[PowDroid] Recording in progress from {start_user_session.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(
+        f"[PowDroid] Recording in progress from {start_user_session.strftime('%Y-%m-%d %H:%M:%S')}"
+    )
 
     input("=> Press ENTER once you finished your test session.")
     stop_user_session = datetime.now()
-    print(f"[PowDroid] Recording session completed at {stop_user_session.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(
+        f"[PowDroid] Recording session completed at {stop_user_session.strftime('%Y-%m-%d %H:%M:%S')}"
+    )
 
     duration = stop_user_session - start_user_session
     days = duration.days
@@ -48,18 +58,24 @@ def record_session(verbose):
 
     return start_user_session, stop_user_session
 
+
 def process_batterystats(verbose):
     print("[PowDroid Step 3/4] Processing battery data...")
     print("[PowDroid] Please reconnect your device via USB.")
     adb.wait_for_device_connection(verbose)
 
-    print("[PowDroid] This step may take a few moments, please wait while processing collected data...")
+    print(
+        "[PowDroid] This step may take a few moments, please wait while processing collected data..."
+    )
 
     adb.dump_batterystats(verbose)
     file_name = adb.conversion_batterystats()
     return file_name
 
-def generate_outputs(file_name, start_user_session, stop_user_session, output_formats, verbose):
+
+def generate_outputs(
+    file_name, start_user_session, stop_user_session, output_formats, verbose
+):
     print("[PowDroid Step 4/4] Generating output files...")
 
     def to_timestamp_ms(dt):
@@ -75,14 +91,25 @@ def generate_outputs(file_name, start_user_session, stop_user_session, output_fo
         csv_path = csv.process_csv_file(start_ts, stop_ts)
 
     if "csv" in output_formats:
-        print(f"[PowDroid] CSV file generated successfully: {csv_path}")
+        if csv_path:
+            print(f"[PowDroid] CSV file generated successfully: {csv_path}")
+        else:
+            print(
+                "[PowDroid] ERROR | No CSV file generated (check timestamps and data)"
+            )
 
     if "html" in output_formats:
-        html_content = html.process_html_file(csv_path)
-        html_path = csv_path.rsplit(".", 1)[0] + ".html"
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(html_content)
-        print(f"[PowDroid] HTML file generated successfully: {html_path}")
+        if csv_path:
+            html_content = html.process_html_file(csv_path)
+            html_path = csv_path.rsplit(".", 1)[0] + ".html"
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(html_content)
+            print(f"[PowDroid] HTML file generated successfully: {html_path}")
+        else:
+            print(
+                "[PowDroid] ERROR | Cannot generate HTML file because CSV is missing."
+            )
+
 
 def main(output_formats, verbose):
     print(r"  ____               ____            _     _ ")
@@ -95,6 +122,10 @@ def main(output_formats, verbose):
     initialize_connection(verbose)
     start_user_session, stop_user_session = record_session(verbose)
     file_name = process_batterystats(verbose)
-    generate_outputs(file_name, start_user_session, stop_user_session, output_formats, verbose)
+    generate_outputs(
+        file_name, start_user_session, stop_user_session, output_formats, verbose
+    )
 
-    print("\n[PowDroid] All tasks completed successfully. Thank you for using PowDroid!")
+    print(
+        "\n[PowDroid] All tasks completed successfully. Thank you for using PowDroid!"
+    )

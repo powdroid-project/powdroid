@@ -1,0 +1,46 @@
+{
+    "language": "English",
+    "about": {
+        "description": "PowDroid is a battery consumption profiler tool for Android devices.\n\nThe project is developed and maintained by:\n - Olivier Le Goaër\n - Adel Noureddine\n\nPrevious contributors : \n - Fares Bouaffar (initial author)\n - Pierre-Antoine Larguet\n - Alex Striedelmeyer\n - Julien Desprez\n - Nathan Lorit.",
+        "license": "\nPowDroid is licensed under the GNU GPL 3 license only (GPL-3.0-only).\n\nCopyright (c) 2021-2025, Université de Pau et des Pays de l'Adour. All rights reserved. This program and the accompanying materials are made available under the terms of the GNU General Public License v3.0 only (GPL-3.0-only) which accompanies this distribution, and is available at: https://www.gnu.org/licenses/gpl-3.0.en.html",
+        "github_repo": "GITHUB REPOSITORY"
+    },
+    "check_config": {
+        "title": "CHECKING CONFIGURATION...",
+        "android_sdk": "Android SDK",
+        "adb_server": "ADB Server",
+        "python_version": "Python Version",
+        "pandas_library": "Pandas Library",
+        "gui_module": "GUI Module",
+        "go_runtime": "Go Runtime",
+        "status" : {
+            "ok": "OK",
+            "failed": "FAILED",
+            "error": "ERROR",
+            "in_progress": "IN PROGRESS..."
+        }
+    },
+    "information_popup": {
+        "title": "INFORMATION",
+        "plug": "Please <b style='color: #57C18B;'>PLUG</b> your device to complete the recording.",
+        "unplug": "You can <b style='color: #57C18B;'>UNPLUG</b> your device to start the recording."
+    },
+    "homepage": {
+        "phone_status": {
+            "connected": "Connected device",
+            "disconnected": "No device detected"
+        },
+        "record_button": "START RECORDING",
+        "instructions": {
+            "title": "Instructions",
+            "content": "1. Connect your Android smartphone via USB<br><br>2. Enable USB debugging in developer options<br><br>3. Click 'START RECORDING' to start monitoring<br><br>4. Follow the on-screen instructions."
+        }
+    },
+    "record": {
+        "title": "RECORDING...",
+        "status": "Ready to record",
+        "start": "Start Recording",
+        "stop": "Stop Recording"
+    }
+
+}
