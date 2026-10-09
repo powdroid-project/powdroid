@@ -1,95 +1,43 @@
+"""PowDroid entry point: starts the GUI without arguments, the CLI otherwise."""
 
-import os
-import subprocess
-import sys
 import argparse
-import signal
-import json
+import os
+import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-def handle_exit(signum, frame):
-    print("[PowDroid] INFO | Execution interrupted. Exiting...")
-    sys.exit(0)
+from core import __version__  # noqa: E402
 
 
 def main():
-    signal.signal(signal.SIGINT, handle_exit)
+    if len(sys.argv) == 1:
+        from gui.app import main as gui_main
 
-    # Load version from .powdroid_config.json, robust to working directory
-    try:
-        base_dir = os.path.abspath(os.path.dirname(__file__))
-        config_path = os.path.join(base_dir, ".powdroid_config.json")
-        with open(config_path, encoding="utf-8") as f:
-            config_data = json.load(f)
-            version = config_data.get("version", "Unknown version")
-    except Exception:
-        version = "Unknown version"
+        return gui_main()
 
-    class CustomArgumentParser(argparse.ArgumentParser):
-        def error(self, message):
-            print(f"[Debug] ERROR | {message}. Use -h or --help for usage information.")
-            sys.exit(2)
-
-    parser = CustomArgumentParser(
-        description=f"PowDroid CLI [Version {version}]"
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        help="output format (csv, html, or both separated by comma)",
-        metavar="EXT",
-    )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="verbose mode for debugging"
-    )
-    parser.add_argument(
-        "-t", "--traceback", action="store_true", help="traceback mode for analysis"
-    )
+    parser = argparse.ArgumentParser(description=f"PowDroid {__version__} – energy profiler for Android")
+    parser.add_argument("-o", "--output", default="csv", metavar="EXT",
+                        help="output formats: csv, html or csv,html (default: csv)")
+    parser.add_argument("-d", "--dir", default=".", help="output directory (default: current directory)")
+    parser.add_argument("-s", "--serial", help="device serial, when several devices are connected")
+    parser.add_argument("-v", "--verbose", action="store_true", help="print more details")
+    parser.add_argument("-t", "--traceback", action="store_true", help="print the traceback on errors")
+    parser.add_argument("--version", action="version", version=f"PowDroid {__version__}")
     args = parser.parse_args()
 
-    output_formats = []
-    if args.output:
-        output_formats = args.output.split(",")
-        for ext in output_formats:
-            if ext not in ["csv", "html"]:
-                print(
-                    f"[Debug] ERROR | Invalid output format: {ext}. Allowed formats are 'csv' and 'html'."
-                )
-                return
+    formats = [f.strip() for f in args.output.split(",") if f.strip()]
+    invalid = [f for f in formats if f not in ("csv", "html")]
+    if invalid or not formats:
+        parser.error(f"invalid output format: {', '.join(invalid) or args.output!r} (use csv, html or csv,html)")
 
-    if (args.verbose or args.traceback) and not output_formats:
-        print(
-            "[Debug] ERROR | The -o, --output argument is required when -v or -t is used."
-        )
-        return
+    from cli.cli import main as cli_main
 
-    if len(output_formats) > 1:
-        print(
-            f"[PowDroid] INFO | Multiple output formats selected: {', '.join(output_formats)}"
-        )
-
-    if len(sys.argv) > 1:
-        # Utiliser la nouvelle interface CLI de configuration
-        try:
-            from cli.setup_cli import main as setup_main
-
-            setup_main(verbose=args.verbose)
-        except subprocess.CalledProcessError as e:
-            print(f"[Debug] ERROR | Setup check failed with error: {e}")
-            return
-        except Exception as e:
-            print(f"[Debug] ERROR | Setup check failed: {e}")
-            return
-
-        from cli.cli_interface import main as cli_main
-
-        cli_main(output_formats, verbose=args.verbose)
-    else:
-        # Utilisation de PyQt par défaut
-        from gui.gui_interface import main as gui_main
-
-        gui_main()
+    try:
+        return cli_main(formats, args.dir, args.serial, args.verbose, args.traceback)
+    except KeyboardInterrupt:
+        print("\n[PowDroid] Interrupted.")
+        return 130
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

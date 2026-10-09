@@ -1,46 +1,68 @@
 {
-    "language": "English",
-    "about": {
-        "description": "PowDroid is a battery consumption profiler tool for Android devices.\n\nThe project is developed and maintained by:\n - Olivier Le Goaër\n - Adel Noureddine\n\nPrevious contributors : \n - Fares Bouaffar (initial author)\n - Pierre-Antoine Larguet\n - Alex Striedelmeyer\n - Julien Desprez\n - Nathan Lorit.",
-        "license": "\nPowDroid is licensed under the GNU GPL 3 license only (GPL-3.0-only).\n\nCopyright (c) 2021-2025, Université de Pau et des Pays de l'Adour. All rights reserved. This program and the accompanying materials are made available under the terms of the GNU General Public License v3.0 only (GPL-3.0-only) which accompanies this distribution, and is available at: https://www.gnu.org/licenses/gpl-3.0.en.html",
-        "github_repo": "GITHUB REPOSITORY"
+    "app": {
+        "theme_tooltip": "Switch light/dark theme",
+        "about_tooltip": "About PowDroid",
+        "about_title": "About PowDroid",
+        "about_text": "<p><b>PowDroid {version}</b> is an off-device energy profiler for Android.</p><p>Developed and maintained by Olivier Le Goaër and Adel Noureddine.<br>Previous contributors: Fares Bouaffar (initial author), Pierre-Antoine Larguet, Alex Striedelmeyer, Julien Desprez, Nathan Lorit.</p><p>Licensed under the GNU GPL v3.0 only (GPL-3.0-only).<br>Copyright (c) 2021-2025, Université de Pau et des Pays de l'Adour.</p><p><a href=\"https://github.com/powdroid-project/powdroid\">github.com/powdroid-project/powdroid</a></p>",
+        "busy_quit": "Data is still being collected from the device. Quit anyway?"
     },
-    "check_config": {
-        "title": "CHECKING CONFIGURATION...",
-        "android_sdk": "Android SDK",
-        "adb_server": "ADB Server",
-        "python_version": "Python Version",
-        "pandas_library": "Pandas Library",
-        "gui_module": "GUI Module",
-        "go_runtime": "Go Runtime",
-        "status" : {
-            "ok": "OK",
-            "failed": "FAILED",
-            "error": "ERROR",
-            "in_progress": "IN PROGRESS..."
-        }
+    "checks": {
+        "title": "Configuration",
+        "running": "Checking configuration…",
+        "failed": "Some checks failed. Fix them and restart PowDroid."
     },
-    "information_popup": {
-        "title": "INFORMATION",
-        "plug": "Please <b style='color: #57C18B;'>PLUG</b> your device to complete the recording.",
-        "unplug": "You can <b style='color: #57C18B;'>UNPLUG</b> your device to start the recording."
-    },
-    "homepage": {
-        "phone_status": {
-            "connected": "Connected device",
-            "disconnected": "No device detected"
-        },
-        "record_button": "START RECORDING",
-        "instructions": {
-            "title": "Instructions",
-            "content": "1. Connect your Android smartphone via USB<br><br>2. Enable USB debugging in developer options<br><br>3. Click 'START RECORDING' to start monitoring<br><br>4. Follow the on-screen instructions."
-        }
+    "home": {
+        "device_title": "Device",
+        "no_device": "No device detected",
+        "no_device_hint": "Connect your phone over USB with USB debugging enabled.",
+        "unauthorized": "Device not authorized",
+        "unauthorized_hint": "Accept the USB debugging prompt on your phone.",
+        "android": "Android {version} · {serial}",
+        "start": "Start recording",
+        "preparing": "Preparing device…",
+        "open_report": "Open a CSV report…",
+        "output_dir": "Output folder:",
+        "change": "Change…",
+        "instructions_title": "Before you start",
+        "instructions": "<ol><li>Enable <b>USB debugging</b> in the developer options and connect your phone.</li><li>Disable Battery Saver and screen timeout; set brightness and volume to 50%.</li><li>Close running apps and background services.</li><li>Click <b>Start recording</b>, unplug the phone and run your scenario for at least 5 minutes.</li><li>Plug the phone back in to collect the results.</li></ol>"
     },
     "record": {
-        "title": "RECORDING...",
-        "status": "Ready to record",
-        "start": "Start Recording",
-        "stop": "Stop Recording"
+        "step_unplug": "Unplug your device",
+        "step_unplug_hint": "The recording starts automatically as soon as the phone is unplugged.",
+        "step_recording": "Recording",
+        "step_recording_hint": "Run your test scenario on the phone, then click Stop.",
+        "replugged_warning": "The phone is plugged in: charging distorts the measurements. Unplug it until you stop the recording.",
+        "stop": "Stop recording",
+        "step_replug": "Plug your device back in",
+        "step_replug_hint": "Battery data will be collected as soon as the phone is connected.",
+        "step_processing": "Collecting data",
+        "processing_offset": "Reading device clock…",
+        "processing_bugreport": "Generating the bugreport (this can take a few minutes)…",
+        "processing_parse": "Computing energy metrics…",
+        "step_error": "Something went wrong",
+        "retry": "Retry",
+        "cancel": "Cancel",
+        "started_at": "Started at {time}"
+    },
+    "report": {
+        "title": "Energy report",
+        "duration": "Duration",
+        "energy": "Total energy",
+        "mean_power": "Average power",
+        "peak_power": "Peak power",
+        "charge": "Consumed charge",
+        "voltage": "Voltage",
+        "tab_energy": "Energy",
+        "tab_cumulative": "Cumulative energy",
+        "tab_power": "Power and components",
+        "tab_data": "Data",
+        "filter": "Filter rows (e.g. an app name)…",
+        "open_folder": "Open folder",
+        "export_html": "Export HTML",
+        "exported": "HTML report written to {path}",
+        "new_recording": "New recording",
+        "time": "Time",
+        "load_error": "Could not read the report: {error}",
+        "empty": "This report contains no data."
     }
-
 }

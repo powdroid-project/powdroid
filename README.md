@@ -5,14 +5,14 @@ Simply run your application for a few minutes to generate a machine-ready output
 
 ## 🔧 Setup
 
-Install the following dependencies:
-- [Android SDK platform tools](https://developer.android.com/studio/releases/platform-tools)
-- [Python 3.x](https://www.python.org/downloads/) + Pandas + matplotlib + PyQT6
-- [GO runtime](https://go.dev/dl/)
+PowDroid only needs Python and adb:
+- [Python 3.9+](https://www.python.org/downloads/). The command-line interface uses the standard library only.
+- [Android SDK platform tools](https://developer.android.com/studio/releases/platform-tools) (`adb`).
+- For the graphical interface: `pip install -r requirements.txt` (PyQt6 + matplotlib).
 
-⚠️ Then you must add command ```adb``` to your environment PATH (python and go should already be in the path, if not add them like adb):
+⚠️ The `adb` command must be in your PATH:
 - On Windows, edit the PATH environment variable in Advanced System Settings, then System Properties, then Environment Variables, and finally choose Path and edit it by adding the new path (the location where you installed platform-tools).
-- On Unix-style systems: `export PATH=/the/path/to/target/:$PATH` to your .profile or .bashrc file.
+- On Unix-style systems: `export PATH=/the/path/to/platform-tools:$PATH` in your .profile or .bashrc file.
 
 ## 🚀 Getting started
 
@@ -32,11 +32,15 @@ On your phone a prompt should appear asking for permission for debugging. If the
 
 ### Running and Using PowDroid (CLI or GUI)
 
-- Command-line interface (CLI): just run `python /path/to/powdroid.py -o csv` in your terminal and follow the on-screen instructions.
+- Graphical interface (GUI): run `python /path/to/powdroid.py` without arguments.
+  Results are written to `~/PowDroid` by default (configurable from the home screen), the report page shows charts, a data table and can export an HTML report.
+- Command-line interface (CLI): run `python /path/to/powdroid.py -o csv` (or `-o csv,html`) and follow the on-screen instructions.
+  Use `-d DIR` to choose the output folder, `-s SERIAL` when several devices are connected, and `--help` for all options.
 
-For more options, use the `--help` command.
+Each session produces `PowDroid_<date>.csv` (one row per interval: voltage, current, power, energy, top app and component states) and keeps the raw bugreport in `dump/`.
+Battery history is parsed directly in Python; earlier versions needed the Go runtime and battery-historian.
 
-- Graphical interface (GUI): the GUI mode can be started by running Python without any arguments.
+Run the tests with `python -m unittest discover tests`.
 
 ## 🤝 Contributors
 
@@ -69,5 +73,5 @@ To cite PowDroid, please cite our paper in the 2nd International Workshop on Sus
 
 PowDroid is licensed under the GNU GPL 3 license only (GPL-3.0-only).
 
-Copyright (c) 2021-2025, Université de Pau et des Pays de l'Adour.
+Copyright (c) 2021-2026, Université de Pau et des Pays de l'Adour.
 All rights reserved. This program and the accompanying materials are made available under the terms of the GNU General Public License v3.0 only (GPL-3.0-only) which accompanies this distribution, and is available at: https://www.gnu.org/licenses/gpl-3.0.en.html
