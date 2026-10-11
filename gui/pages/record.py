@@ -37,14 +37,14 @@ CENTER = Qt.AlignmentFlag.AlignCenter
 
 
 class RecordPage(QWidget):
-    finished = pyqtSignal(str)  # CSV path
+    finished = pyqtSignal(object)  # session.Result
     cancelled = pyqtSignal()
-    collecting = pyqtSignal(bool)  # True while adb bugreport runs (device polling is paused)
+    collecting = pyqtSignal(bool)  # True while the batterystats dump runs (device polling is paused)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.state = None
-        self.serial = None
+        self.device = None
         self.output_dir = None
         self.start_time = None
         self.stop_time = None
@@ -93,9 +93,9 @@ class RecordPage(QWidget):
 
     # -- public API -------------------------------------------------------
 
-    def begin(self, serial, output_dir):
+    def begin(self, device, output_dir):
         """Called once the device has been prepared (stats reset)."""
-        self.serial = serial
+        self.device = device
         self.output_dir = output_dir
         self.start_time = self.stop_time = None
         self._set_state(State.WAIT_UNPLUG)
@@ -104,7 +104,9 @@ class RecordPage(QWidget):
         return self.state in (State.RECORDING, State.WAIT_REPLUG, State.PROCESSING)
 
     def on_device_changed(self, device):
-        connected = device is not None and device.ready and device.serial == self.serial
+        if self.state is None:
+            return  # not recording
+        connected = device is not None and device.ready and device.serial == self.device.serial
         if self.state == State.WAIT_UNPLUG and not connected:
             self.start_time = datetime.now()
             self.elapsed.start()
@@ -163,17 +165,17 @@ class RecordPage(QWidget):
     def _collect(self):
         self._set_state(State.PROCESSING)
         self.collecting.emit(True)
-        task = workers.Task(session.collect, self.serial, self.start_time, self.stop_time,
+        task = workers.Task(session.collect, self.device, self.start_time, self.stop_time,
                             self.output_dir, with_progress=True, parent=self)
         task.progress.connect(lambda step: self.hint.setText(t(f"record.processing_{step}")))
         task.succeeded.connect(self._collected)
         task.failed.connect(self._failed)
         task.start()
 
-    def _collected(self, written):
+    def _collected(self, result):
         self.collecting.emit(False)
         self.state = None
-        self.finished.emit(str(written[0]))
+        self.finished.emit(result)
 
     def _failed(self, message):
         self.collecting.emit(False)

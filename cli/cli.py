@@ -6,7 +6,7 @@ import threading
 import traceback
 from datetime import datetime
 
-from core import PowDroidError, adb, checks, session
+from core import PowDroidError, adb, checks, metrics, session
 
 
 def log(message):
@@ -96,11 +96,17 @@ def _record(output_formats, out_dir, serial, verbose):
     log("Step 3/4 | Collecting battery data")
     log("Please reconnect your device via USB.")
     wait(True, serial, verbose)
-    written = with_spinner("Collecting battery data (the bugreport can take a few minutes)...",
-                           session.collect, serial, start, stop, out_dir, "html" in output_formats)
+    result = with_spinner("Reading battery statistics...",
+                          session.collect, device, start, stop, out_dir, "html" in output_formats)
 
-    log("Step 4/4 | Output files")
-    for path in written:
-        log(f"Written {path}")
-    log("All tasks completed successfully. Thank you for using PowDroid!")
+    log("Step 4/4 | Results")
+    for path in (result.csv_path, result.json_path, result.html_path):
+        if path:
+            log(f"Written {path}")
+    figures = metrics.summary_items(result.summary)
+    log(f"Energy {figures['energy']}, average power {figures['mean_power']} over "
+        f"{figures['duration']} (measured time {figures['coverage']}).")
+    for warning in result.warnings:
+        log(f"WARNING | {warning}")
+    log("All tasks completed. Thank you for using PowDroid!")
     return 0

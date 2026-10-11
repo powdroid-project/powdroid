@@ -22,7 +22,9 @@ PowDroid only needs Python and adb:
 - Disable screen timeout
 - Set the brightness and sound level at 50%
 - Kill running apps and background services
-- A minimum 5-minute session (Battery level must decrease)
+- Start with the battery below 100 %: right after a full charge, the battery voltage is temporarily higher
+- Record long enough to consume at least 20 mAh (often 5 to 10 minutes): the coulomb counter has a 1 mAh resolution, so this keeps energy and power within ±5 %. PowDroid shows this uncertainty and warns when it is larger
+- Unplug the phone as soon as the recording page asks for it, and plug it back only after stopping
 
 ### Initial configuration
 
@@ -37,10 +39,28 @@ On your phone a prompt should appear asking for permission for debugging. If the
 - Command-line interface (CLI): run `python /path/to/powdroid.py -o csv` (or `-o csv,html`) and follow the on-screen instructions.
   Use `-d DIR` to choose the output folder, `-s SERIAL` when several devices are connected, and `--help` for all options.
 
-Each session produces `PowDroid_<date>.csv` (one row per interval: voltage, current, power, energy, top app and component states) and keeps the raw bugreport in `dump/`.
-Battery history is parsed directly in Python; earlier versions needed the Go runtime and battery-historian.
+Battery data is read with `adb shell dumpsys batterystats -c` (a few seconds) and parsed directly in Python; earlier versions needed the Go runtime, battery-historian and a slow `adb bugreport`.
 
-Run the tests with `python -m unittest discover tests`.
+### Output files (format v3)
+
+Each session produces, in the output folder:
+- `PowDroid_<date>.csv`: one row per interval during which no tracked state changed; the rows cover the whole session. Columns:
+  - time: `start_ms`, `end_ms` (device epoch ms), `elapsed_s` (since the session start), `duration_ms`;
+  - battery: `battery_level_pct`, `voltage_mv`, `charge_mah` (coulomb counter), `current_ma`, `power_w`, `energy_j`, `consumed_mah`, `temperature_c`;
+  - components (0/1): `plugged`, `screen`, `cpu_running`, `wifi`, `wifi_radio`, `mobile_radio`, `gps`, `bluetooth`, `camera`, `video`, `audio`, `flashlight`, `sensor`, `battery_saver`, plus `brightness` (0–4);
+  - `top_app` (while the screen is on) and `wakelocks` (all held, `;`-separated).
+
+  Empty cells mean unknown. In particular, current, power and energy are left empty while the phone is plugged in, because the coulomb counter then measures charging.
+- `PowDroid_<date>.json`: the device, the requested and measured session start and stop, the clock offset, totals (energy, average power and current, consumed charge, measured time) and warnings about the reliability of the results (phone plugged in, history overflow, too little charge consumed for the 1 mAh counter resolution).
+- `PowDroid_<date>.html` when requested, and the raw `dumpsys` output in `dump/`.
+
+How the figures are obtained:
+- The current comes from the battery coulomb counter: for each reading, the charge drop until the next reading divided by the time in between. The counter has a 1 mAh resolution, so energy and power are known to about ±1 mAh relative to the charge consumed (shown as ± % in the reports). Some phones update the reading only every minute or so: the power is then an average over such periods (PowDroid warns about it).
+- The voltage is interpolated between the phone's readings (except across plugging or unplugging). Power is voltage × current and energy is power × duration, row by row.
+- If the session starts before the phone is unplugged or ends after it is plugged back in, those edges are left out. Plugging in during the session is reported, and those rows have no current, power or energy.
+- Device and computer clocks are aligned when the results are collected, to a few milliseconds.
+
+Run the tests with `python -m unittest discover tests`. They need no phone: `tests/fake_adb.py` simulates a device, including plugging, clock skew and the battery history.
 
 ## 🤝 Contributors
 

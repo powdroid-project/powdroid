@@ -1,199 +1,270 @@
-"""Turn battery history intervals into PowDroid's per-interval energy CSV."""
+"""Turn a parsed battery history into PowDroid's per-interval energy CSV (format v3).
+
+Each row covers an interval during which no tracked state changed. Rows tile the
+recorded session exactly, from its start to its stop. Unknown values are left empty;
+in particular the current (and so power and energy) is unknown while the phone is
+plugged in, because the coulomb counter then measures charging, not consumption.
+"""
 
 import csv
+from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
 
-COLUMNS = [
-    "start_time",
-    "end_time",
-    "Duration (mS)",
-    "Voltage (mV)",
-    "Remaining_charge (mAh)",
-    "Intensity (mA)",
-    "Power (W)",
-    "Consumed charge(mAh)",
-    "Energy (J)",
-    "Top app",
-    "Screen(ON/OFF)",
-    "GPS(ON/OFF)",
-    "Mobile_Radio(ON/OFF)",
-    "WiFi(ON/OFF)",
-    "Wifi radio",
-    "Camera(ON/OFF)",
-    "Video (ON/OFF)",
-    "Audio(ON/OFF)",
-    "Wakelock_in (Service)",
-]
+from core import PowDroidError
+from core.history import Interval
 
-# CSV column -> history metric, for the on/off columns.
-BOOL_COLUMNS = {
-    "Screen(ON/OFF)": "Screen",
-    "GPS(ON/OFF)": "GPS",
-    "Mobile_Radio(ON/OFF)": "Mobile radio active",
-    "WiFi(ON/OFF)": "Wifi on",
-    "Wifi radio": "Wifi radio",
-    "Camera(ON/OFF)": "Camera",
-    "Video (ON/OFF)": "Video",
-    "Audio(ON/OFF)": "Audio",
+# The on/off columns and their display names (GUI chart bands).
+LABELS = {
+    "plugged": "Plugged", "screen": "Screen", "cpu_running": "CPU running", "wifi": "WiFi",
+    "wifi_radio": "WiFi radio", "mobile_radio": "Mobile radio", "gps": "GPS", "bluetooth": "Bluetooth",
+    "camera": "Camera", "video": "Video", "audio": "Audio", "flashlight": "Flashlight",
+    "sensor": "Sensors", "battery_saver": "Battery saver",
 }
-TEXT_COLUMNS = {"Top app", "Wakelock_in (Service)"}
-NUMERIC_COLUMNS = set(COLUMNS) - set(BOOL_COLUMNS) - TEXT_COLUMNS
-FLOAT_COLUMNS = {"Intensity (mA)", "Power (W)", "Consumed charge(mAh)", "Energy (J)"}
+BOOL_COLUMNS = list(LABELS)
+COLUMNS = [
+    "start_ms", "end_ms", "elapsed_s", "duration_ms",
+    "battery_level_pct", "voltage_mv", "charge_mah", "current_ma", "power_w", "energy_j", "consumed_mah",
+    "temperature_c", "brightness",
+    *BOOL_COLUMNS,
+    "top_app", "wakelocks",
+]
+INT_COLUMNS = {"start_ms", "end_ms", "duration_ms", "battery_level_pct", "voltage_mv", "charge_mah", "brightness"}
+FLOAT_COLUMNS = {"elapsed_s", "current_ma", "power_w", "energy_j", "consumed_mah", "temperature_c"}
+TEXT_COLUMNS = {"top_app", "wakelocks"}
 
 
-def _with_intensity(coulomb):
-    """Current (mA) of each coulomb-counter interval: charge drop to the next reading over its duration."""
-    result = []
-    for i, iv in enumerate(coulomb):
+def _currents(history):
+    """Intervals of known current (mA), one per coulomb-counter reading.
+
+    The current of a reading is the charge drop until the next reading over the time in
+    between. It is unknown for the last reading and while the phone is plugged in.
+    """
+    coulomb = history.intervals["charge_mah"]
+    plugged = history.intervals["plugged"]
+    currents = []
+    for iv, following in zip(coulomb, coulomb[1:]):
         hours = (iv.end - iv.start) / 3_600_000
-        if i + 1 < len(coulomb) and hours > 0:
-            result.append((iv, (iv.value - coulomb[i + 1].value) / hours))
-        else:
-            result.append((iv, None))
-    return result
+        if hours > 0 and not any(p.start < iv.end and p.end > iv.start for p in plugged):
+            currents.append(Interval(iv.start, iv.end, (iv.value - following.value) / hours))
+    return currents
 
 
-class _Sweep:
-    """Finds, for successive increasing segments [a, b], the intervals containing them."""
+def _voltages(history, times):
+    """Battery voltage (mV) at each of the given times, interpolated between readings.
 
-    def __init__(self, items, key=lambda x: x):
-        self.items = items
-        self.key = key
-        self.next = 0
-        self.active = []
+    Phones log the voltage only now and then (sometimes once a minute), so holding the
+    last reading lags behind and, during a discharge, overestimates it. Between two
+    readings the voltage is interpolated linearly, except across a plug-in or unplug
+    (the charging voltage differs), where the last reading is held.
+    """
+    readings = history.intervals["voltage_mv"]
+    plug_changes = [t for p in history.intervals["plugged"] for t in (p.start, p.end)]
+    segments = []  # (start, end, value at start, value at end)
+    for iv, following in zip(readings, readings[1:] + [None]):
+        end_value = iv.value
+        if (following is not None and following.start == iv.end
+                and not any(iv.start < t <= iv.end for t in plug_changes)):
+            end_value = following.value
+        segments.append((iv.start, iv.end, iv.value, end_value))
+    starts = [s[0] for s in segments]
 
-    def containing(self, a, b):
-        while self.next < len(self.items) and self.key(self.items[self.next]).start <= a:
-            self.active.append(self.items[self.next])
-            self.next += 1
-        self.active = [x for x in self.active if self.key(x).end >= b]
-        return self.active
+    voltages = []
+    for t in times:
+        k = bisect_right(starts, t) - 1
+        if k < 0 or t > segments[k][1]:
+            voltages.append(None)
+            continue
+        start, end, v0, v1 = segments[k]
+        voltages.append(round(v0 + (v1 - v0) * (t - start) / (end - start)) if end > start else v0)
+    return voltages
 
 
-def compute_rows(intervals, start_ms, stop_ms):
-    """Build one CSV row per elementary interval between start_ms and stop_ms (device time)."""
-    times = sorted({t for ivs in intervals.values() for iv in ivs for t in (iv.start, iv.end)
-                    if start_ms <= t <= stop_ms})
-    if len(times) < 2:
+def compute_rows(history, start_ms, stop_ms):
+    """Build the rows covering [start_ms, stop_ms] (device time).
+
+    The row boundaries are the session start and stop plus every state change in
+    between, so each history interval covers a contiguous run of rows.
+    """
+    if stop_ms <= start_ms:
         return []
+    times = sorted({start_ms, stop_ms} | {
+        t for intervals in history.intervals.values() for iv in intervals for t in (iv.start, iv.end)
+        if start_ms < t < stop_ms})
+    count = len(times) - 1
 
-    sweeps = {m: _Sweep(ivs) for m, ivs in intervals.items()}
-    intensity = _Sweep(_with_intensity(intervals.get("Coulomb charge", [])), key=lambda x: x[0])
+    def row_ranges(intervals):
+        """(first row, end row, value) for each interval overlapping the session."""
+        for iv in intervals:
+            first = bisect_left(times, max(iv.start, start_ms))
+            end = bisect_left(times, min(iv.end, stop_ms))
+            if first < end:
+                yield first, end, iv.value
 
-    def first(metric, a, b):
-        found = sweeps[metric].containing(a, b) if metric in sweeps else []
-        return found[0].value if found else None
+    def column(intervals):
+        values = [None] * count
+        # Filled latest first so that, where intervals overlap, the earliest one wins.
+        for first, end, value in row_ranges(reversed(intervals)):
+            values[first:end] = [value] * (end - first)
+        return values
+
+    # Wakelocks can overlap and are all kept (below); other states keep one value per row.
+    states = {metric: column(intervals) for metric, intervals in history.intervals.items()
+              if metric != "wakelock"}
+    states["current_ma"] = column(_currents(history))
+    states["voltage_mv"] = _voltages(history, [(a + b) / 2 for a, b in zip(times, times[1:])])
+    wakelocks = [set() for _ in range(count)]
+    for first, end, name in row_ranges(history.intervals["wakelock"]):
+        for i in range(first, end):
+            wakelocks[i].add(name)
 
     rows = []
-    for a, b in zip(times, times[1:]):
-        duration = b - a
-        voltage = first("Voltage", a, b)
-        found = intensity.containing(a, b)
-        current = found[0][1] if found else None
-
-        seconds = duration / 1000
-        power = (voltage or 0) / 1000 * (current or 0) / 1000
+    for i, (a, b) in enumerate(zip(times, times[1:])):
+        seconds = (b - a) / 1000
+        voltage, current = states["voltage_mv"][i], states["current_ma"][i]
+        power = voltage * current / 1e6 if voltage is not None and current is not None else None
         row = {
-            "start_time": a,
-            "end_time": b,
-            "Duration (mS)": duration,
-            "Voltage (mV)": voltage,
-            "Remaining_charge (mAh)": first("Coulomb charge", a, b),
-            "Intensity (mA)": current,
-            "Power (W)": power,
-            "Consumed charge(mAh)": (current or 0) * seconds / 3600,
-            "Energy (J)": power * seconds,
-            "Wakelock_in (Service)": first("Wakelock_in", a, b),
+            "start_ms": a,
+            "end_ms": b,
+            "elapsed_s": (a - start_ms) / 1000,
+            "duration_ms": b - a,
+            "battery_level_pct": states["battery_level_pct"][i],
+            "voltage_mv": voltage,
+            "charge_mah": states["charge_mah"][i],
+            "current_ma": current,
+            "power_w": power,
+            "energy_j": power * seconds if power is not None else None,
+            "consumed_mah": current * seconds / 3600 if current is not None else None,
+            "temperature_c": states["temperature_c"][i],
+            "brightness": states["brightness"][i],
+            "wakelocks": ";".join(sorted(wakelocks[i])) or None,
         }
-        for column, metric in BOOL_COLUMNS.items():
-            row[column] = first(metric, a, b) is not None
+        for column_name in BOOL_COLUMNS:
+            row[column_name] = bool(states[column_name][i])
         # As in battery-historian, the top app only counts while the screen is on.
-        row["Top app"] = first("Top app", a, b) if row["Screen(ON/OFF)"] else None
+        row["top_app"] = states["top_app"][i] if row["screen"] else None
         rows.append(row)
     return rows
 
 
-def format_value(column, value):
-    if value is None:
-        return ""
+def _formatter(column):
+    """CSV text of a value of this column; None (unknown) is an empty cell."""
+    if column in BOOL_COLUMNS:
+        return lambda v: "1" if v else "0"
     if column in FLOAT_COLUMNS:
-        return f"{value:f}"
-    return str(value)
+        return lambda v: "" if v is None else f"{v:.10g}"
+    return lambda v: "" if v is None else str(v)
+
+
+def _parser(column):
+    """Value of this column from its CSV text."""
+    if column in BOOL_COLUMNS:
+        return lambda text: text == "1"
+    if column in TEXT_COLUMNS:
+        return lambda text: text or None
+    number = int if column in INT_COLUMNS else float
+    return lambda text: number(text) if text else None
+
+
+_FORMATTERS = [(c, _formatter(c)) for c in COLUMNS]
+
+
+def format_row(row):
+    """The CSV cells of a row, in COLUMNS order."""
+    return [format_cell(row[c]) for c, format_cell in _FORMATTERS]
 
 
 def write_csv(rows, path):
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(COLUMNS)
-        for row in rows:
-            writer.writerow([format_value(c, row.get(c)) for c in COLUMNS])
+        writer.writerows(format_row(row) for row in rows)
 
 
-def _number(text):
-    try:
-        return float(text) if text not in ("", None) else None
-    except ValueError:
-        return None
-
-
-def parse_row(raw):
-    """Type one CSV row given as {column: text}: numbers as float, on/off as bool."""
-    row = {}
-    for column, text in raw.items():
-        if column in BOOL_COLUMNS:
-            row[column] = text == "True"
-        elif column in TEXT_COLUMNS:
-            row[column] = text or None
-        else:
-            row[column] = _number(text)
-    return row
+class CsvFormatError(PowDroidError):
+    """Raised when a file is not a valid PowDroid v3 CSV."""
 
 
 def read_csv(path):
     with open(path, newline="", encoding="utf-8") as f:
-        return [parse_row(raw) for raw in csv.DictReader(f)]
+        reader = csv.reader(f)
+        header = next(reader, [])
+        missing = [c for c in COLUMNS if c not in header]
+        if missing:
+            raise CsvFormatError(f"{path} is not a PowDroid v3 CSV (missing columns: {', '.join(missing)})")
+        parsers = [_parser(c) for c in header]
+        try:
+            return [{c: parse(text) for c, parse, text in zip(header, parsers, cells)} for cells in reader]
+        except ValueError as e:
+            raise CsvFormatError(f"{path}, line {reader.line_num}: {e}") from None
 
 
 @dataclass
 class Summary:
     duration_s: float = 0.0
+    measured_s: float = 0.0  # time with a known current (not plugged, not after the last reading)
+    plugged_s: float = 0.0
     energy_j: float = 0.0
     mean_power_w: float = 0.0
-    peak_power_w: float = 0.0
+    mean_current_ma: float = 0.0
     charge_mah: float = 0.0
-    voltage_min_mv: float = None
-    voltage_max_mv: float = None
+    voltage_min_mv: int = None
+    voltage_max_mv: int = None
+    level_start_pct: int = None
+    level_end_pct: int = None
+    # The coulomb counter has a 1 mAh resolution: relative uncertainty of charge, energy and power.
+    uncertainty_pct: float = None
 
 
 def summarize(rows):
     if not rows:
         return Summary()
-    duration = (rows[-1]["end_time"] - rows[0]["start_time"]) / 1000
-    energy = sum(r["Energy (J)"] or 0 for r in rows)
-    volts = [r["Voltage (mV)"] for r in rows if r["Voltage (mV)"]]
+    measured = [r for r in rows if r["power_w"] is not None]
+    measured_s = sum(r["duration_ms"] for r in measured) / 1000
+    energy = sum(r["energy_j"] for r in measured)
+    charge = sum(r["consumed_mah"] for r in measured)
+    volts = [r["voltage_mv"] for r in rows if r["voltage_mv"]]
+    levels = [r["battery_level_pct"] for r in rows if r["battery_level_pct"] is not None]
     return Summary(
-        duration_s=duration,
+        duration_s=(rows[-1]["end_ms"] - rows[0]["start_ms"]) / 1000,
+        measured_s=measured_s,
+        plugged_s=sum(r["duration_ms"] for r in rows if r["plugged"]) / 1000,
         energy_j=energy,
-        mean_power_w=energy / duration if duration else 0.0,
-        peak_power_w=max((r["Power (W)"] or 0 for r in rows), default=0.0),
-        charge_mah=sum(r["Consumed charge(mAh)"] or 0 for r in rows),
+        mean_power_w=energy / measured_s if measured_s else 0.0,
+        mean_current_ma=charge / (measured_s / 3600) if measured_s else 0.0,
+        charge_mah=charge,
         voltage_min_mv=min(volts, default=None),
         voltage_max_mv=max(volts, default=None),
+        level_start_pct=levels[0] if levels else None,
+        level_end_pct=levels[-1] if levels else None,
+        uncertainty_pct=100 / charge if charge > 0 else None,
     )
 
 
+# English names of the summary figures (the GUI translates the same keys).
+SUMMARY_LABELS = {
+    "duration": "Duration", "energy": "Total energy", "mean_power": "Average power",
+    "mean_current": "Average current", "charge": "Consumed charge", "level": "Battery level",
+    "voltage": "Voltage", "coverage": "Measured time",
+}
+
+
 def summary_items(s):
-    """Formatted summary figures as (key, text) pairs, shared by the GUI and the HTML report."""
+    """Formatted summary figures by key (see SUMMARY_LABELS), shared by the CLI, GUI and HTML report."""
     voltage = ("—" if s.voltage_min_mv is None
                else f"{s.voltage_min_mv / 1000:.2f}–{s.voltage_max_mv / 1000:.2f} V")
-    return [
-        ("duration", format_duration(s.duration_s)),
-        ("energy", format_energy(s.energy_j)),
-        ("mean_power", f"{s.mean_power_w:.3f} W"),
-        ("peak_power", f"{s.peak_power_w:.3f} W"),
-        ("charge", f"{s.charge_mah:.2f} mAh"),
-        ("voltage", voltage),
-    ]
+    level = "—" if s.level_start_pct is None else f"{s.level_start_pct} → {s.level_end_pct} %"
+    coverage = f"{100 * s.measured_s / s.duration_s:.0f} %" if s.duration_s else "—"
+    plus_minus = f" ± {s.uncertainty_pct:.0f} %" if s.uncertainty_pct and s.uncertainty_pct >= 1 else ""
+    return {
+        "duration": format_duration(s.duration_s),
+        "energy": format_energy(s.energy_j) + plus_minus,
+        "mean_power": f"{s.mean_power_w:.3f} W" + plus_minus,
+        "mean_current": f"{s.mean_current_ma:.0f} mA",
+        "charge": f"{s.charge_mah:.2f} mAh",
+        "level": level,
+        "voltage": voltage,
+        "coverage": coverage,
+    }
 
 
 def format_energy(joules):

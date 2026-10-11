@@ -1,17 +1,10 @@
-"""Standalone HTML report for a PowDroid CSV."""
+"""Standalone HTML report of a PowDroid session."""
 
-import csv
 import html
 import json
-from pathlib import Path
 
-from core import metrics
-from core import __version__
+from core import __version__, metrics
 
-CARD_LABELS = {
-    "duration": "Duration", "energy": "Total energy", "mean_power": "Average power",
-    "peak_power": "Peak power", "charge": "Consumed charge", "voltage": "Voltage",
-}
 CHART_JS = "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
 
 TEMPLATE = """<!DOCTYPE html>
@@ -22,9 +15,9 @@ TEMPLATE = """<!DOCTYPE html>
 <title>PowDroid report – __TITLE__</title>
 <script src="__CHART_JS__"></script>
 <style>
-  :root { --bg:#f7f7f8; --panel:#fff; --text:#1d1d1f; --muted:#6b6b72; --border:#e2e2e6; --accent:#5374C9; }
+  :root { --bg:#f7f7f8; --panel:#fff; --text:#1d1d1f; --muted:#6b6b72; --border:#e2e2e6; --accent:#5374C9; --warn:#B7791F; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#1d1d1d; --panel:#282828; --text:#e6e6e6; --muted:#a0a0a0; --border:#3c3c3c; --accent:#7d98e0; }
+    :root { --bg:#1d1d1d; --panel:#282828; --text:#e6e6e6; --muted:#a0a0a0; --border:#3c3c3c; --accent:#7d98e0; --warn:#E8B04B; }
   }
   * { box-sizing: border-box; }
   body { margin:0; padding:24px 16px; background:var(--bg); color:var(--text);
@@ -34,6 +27,8 @@ TEMPLATE = """<!DOCTYPE html>
   .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; }
   .card, .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:14px; }
   .card .label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  .warnings { background:var(--panel); border:1px solid var(--warn); border-radius:8px; padding:10px 14px; color:var(--warn); }
+  .warnings ul { margin:0; padding-left:18px; }
   .card .value { font-size:20px; font-weight:600; margin-top:4px; font-variant-numeric:tabular-nums; }
   .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
   select, input { background:var(--bg); color:var(--text); border:1px solid var(--border);
@@ -51,13 +46,13 @@ TEMPLATE = """<!DOCTYPE html>
     <h1>PowDroid energy report</h1>
     <div class="muted">__TITLE__ · PowDroid __VERSION__</div>
   </header>
+  __WARNINGS__
   <section class="cards">__CARDS__</section>
   <section class="panel">
     <div class="controls">
       <label>View <select id="view">
-        <option value="energy">Energy per interval (J)</option>
-        <option value="cumulative">Cumulative energy (J)</option>
         <option value="power">Power (W)</option>
+        <option value="cumulative">Cumulative energy (J)</option>
       </select></label>
     </div>
     <canvas id="chart" height="110"></canvas>
@@ -73,16 +68,21 @@ TEMPLATE = """<!DOCTYPE html>
 <script>
 const COLUMNS = __COLUMNS__;
 const ROWS = __ROWS__;
-const fmtTime = ms => new Date(ms).toLocaleTimeString();
-const labels = ROWS.map(r => fmtTime(r[0]));
-const iEnergy = COLUMNS.indexOf("Energy (J)"), iPower = COLUMNS.indexOf("Power (W)");
-const energy = ROWS.map(r => Number(r[iEnergy]) || 0);
+const col = name => COLUMNS.indexOf(name);
+// Empty cells (unknown, e.g. while plugged in) are gaps, not zeros.
+const num = v => (v === "" ? null : Number(v));
+// x is the time since the session start, in seconds, so the axis is proportional to time.
+const starts = ROWS.map(r => Number(r[col("elapsed_s")]));
+const ends = ROWS.map((r, i) => starts[i] + Number(r[col("duration_ms")]) / 1000);
+const power = ROWS.map((r, i) => ({ x: starts[i], y: num(r[col("power_w")]) }));
+if (ROWS.length) power.push({ x: ends[ends.length - 1], y: power[power.length - 1].y });
 let acc = 0;
+const cumulative = [{ x: 0, y: 0 }, ...ROWS.map((r, i) => ({ x: ends[i], y: (acc += num(r[col("energy_j")]) || 0) }))];
 const series = {
-  energy: { label: "Energy (J)", data: energy },
-  cumulative: { label: "Cumulative energy (J)", data: energy.map(e => (acc += e)) },
-  power: { label: "Power (W)", data: ROWS.map(r => Number(r[iPower]) || 0) },
+  power: { label: "Power (W)", data: power, stepped: "after" },
+  cumulative: { label: "Cumulative energy (J)", data: cumulative, stepped: false },
 };
+const clock = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
 const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
 let chart = null;
 function draw() {
@@ -91,10 +91,14 @@ function draw() {
   if (chart) chart.destroy();
   chart = new Chart(document.getElementById("chart"), {
     type: "line",
-    data: { labels, datasets: [{ label: s.label, data: s.data, borderColor: accent,
-            backgroundColor: accent + "33", fill: true, pointRadius: 0, borderWidth: 1.5, stepped: true }] },
-    options: { animation: false, interaction: { mode: "index", intersect: false },
-               scales: { x: { ticks: { maxTicksLimit: 10 } }, y: { beginAtZero: true, title: { display: true, text: s.label } } } },
+    data: { datasets: [{ label: s.label, data: s.data, stepped: s.stepped, borderColor: accent,
+            backgroundColor: accent + "33", fill: true, pointRadius: 0, borderWidth: 1.5 }] },
+    options: { animation: false, parsing: false, interaction: { mode: "nearest", axis: "x", intersect: false },
+               plugins: { tooltip: { callbacks: { title: items => clock(items[0].parsed.x) } } },
+               scales: { x: { type: "linear", min: 0, max: ends.length ? ends[ends.length - 1] : 0,
+                              ticks: { maxTicksLimit: 12, callback: clock },
+                              title: { display: true, text: "Time since start (min:s)" } },
+                         y: { beginAtZero: true, title: { display: true, text: s.label } } } },
   });
 }
 document.getElementById("view").addEventListener("change", draw);
@@ -153,31 +157,29 @@ def _script_json(value):
     return json.dumps(value).replace("</", "<\\/")
 
 
-def generate(csv_path):
-    csv_path = Path(csv_path)
-    with open(csv_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        columns = reader.fieldnames
-        raw_rows = list(reader)
-    summary = metrics.summarize([metrics.parse_row(r) for r in raw_rows])
-    table = [[int(r[c]) if c == "start_time" else r[c] for c in columns] for r in raw_rows]
-
+def generate(result):
+    """The HTML page of a session.Result."""
     cards_html = "".join(
-        f'<div class="card"><div class="label">{html.escape(CARD_LABELS[key])}</div>'
+        f'<div class="card"><div class="label">{html.escape(metrics.SUMMARY_LABELS[key])}</div>'
         f'<div class="value">{html.escape(value)}</div></div>'
-        for key, value in metrics.summary_items(summary)
+        for key, value in metrics.summary_items(result.summary).items()
     )
+    warnings_html = ('<section class="warnings"><ul>'
+                     + "".join(f"<li>{html.escape(w)}</li>" for w in result.warnings)
+                     + "</ul></section>") if result.warnings else ""
     return (
         TEMPLATE.replace("__CHART_JS__", CHART_JS)
-        .replace("__TITLE__", html.escape(csv_path.stem))
+        .replace("__TITLE__", html.escape(result.csv_path.stem))
         .replace("__VERSION__", html.escape(__version__))
+        .replace("__WARNINGS__", warnings_html)
         .replace("__CARDS__", cards_html)
-        .replace("__COLUMNS__", _script_json(columns))
-        .replace("__ROWS__", _script_json(table))
+        .replace("__COLUMNS__", _script_json(metrics.COLUMNS))
+        .replace("__ROWS__", _script_json([metrics.format_row(row) for row in result.rows]))
     )
 
 
-def write(csv_path, html_path=None):
-    html_path = Path(html_path or Path(csv_path).with_suffix(".html"))
-    html_path.write_text(generate(csv_path), encoding="utf-8")
+def write(result):
+    """Write the HTML page next to the session's CSV and return its path."""
+    html_path = result.csv_path.with_suffix(".html")
+    html_path.write_text(generate(result), encoding="utf-8")
     return html_path

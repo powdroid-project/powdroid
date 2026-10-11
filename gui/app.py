@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QToolButton, QVBoxLayout, QWidget,
 )
 
-from core import __version__, adb, config
+from core import __version__, adb, config, session
 from gui import theme, workers
 from gui.i18n import set_language, t
 from gui.pages.home import HomePage
@@ -47,7 +47,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         self.home.start_requested.connect(self._prepare)
-        self.home.open_report_requested.connect(self._show_report)
+        self.home.open_report_requested.connect(self._open_report)
         self.home.output_dir_changed.connect(lambda p: self._save(output_dir=p))
         self.record.finished.connect(self._show_report)
         self.record.cancelled.connect(self._go_home)
@@ -118,12 +118,11 @@ class MainWindow(QMainWindow):
         device = self.home.device
         if device is None or not device.ready:
             return
-        serial = device.serial
         self.home.set_busy(True)
 
         def prepared(_):
             self.home.set_busy(False)
-            self.record.begin(serial, self.settings["output_dir"])
+            self.record.begin(device, self.settings["output_dir"])
             self.stack.setCurrentWidget(self.record)
             # The device may already be unplugged by the time preparation finished.
             self.record.on_device_changed(self.home.device)
@@ -132,19 +131,24 @@ class MainWindow(QMainWindow):
             self.home.set_busy(False)
             QMessageBox.warning(self, "PowDroid", message)
 
-        self._run(adb.prepare, serial, on_success=prepared, on_failure=failed)
+        self._run(adb.prepare, device.serial, on_success=prepared, on_failure=failed)
 
-    def _show_report(self, csv_path):
+    def _open_report(self, csv_path):
+        """Load a CSV chosen on the home page (in the background: it can be large)."""
+        def failed(message):
+            QMessageBox.warning(self, t("report.title"), t("report.load_error", error=message))
+
+        self._run(session.load, csv_path, on_success=self._show_report, on_failure=failed)
+
+    def _show_report(self, result):
         if self.report is None:
             from gui.pages.report import ReportPage
 
             self.report = ReportPage()
             self.report.new_recording.connect(self._go_home)
             self.stack.addWidget(self.report)
-        if self.report.load(csv_path, self.settings["theme"]):
-            self.stack.setCurrentWidget(self.report)
-        else:
-            self._go_home()
+        self.report.show_result(result, self.settings["theme"])
+        self.stack.setCurrentWidget(self.report)
 
     def _go_home(self):
         self.stack.setCurrentWidget(self.home_page)
@@ -157,7 +161,7 @@ class MainWindow(QMainWindow):
                 return
         self.watcher.stop()
         if any(task.isRunning() for task in self.findChildren(workers.Task)):
-            # A bugreport may take minutes and cannot be interrupted cleanly: leave immediately.
+            # An adb command (e.g. the batterystats dump) cannot be interrupted cleanly: leave now.
             os._exit(0)
         event.accept()
 

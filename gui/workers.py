@@ -17,7 +17,7 @@ class DeviceWatcher(QThread):
         self.paused = False
 
     def set_paused(self, paused):
-        """Stop polling while another long adb command (bugreport) uses the device."""
+        """Stop polling while another long adb command (the batterystats dump) uses the device."""
         self.paused = paused
 
     def run(self):

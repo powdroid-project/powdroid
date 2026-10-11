@@ -3,7 +3,7 @@
         "theme_tooltip": "Switch light/dark theme",
         "about_tooltip": "About PowDroid",
         "about_title": "About PowDroid",
-        "about_text": "<p><b>PowDroid {version}</b> is an off-device energy profiler for Android.</p><p>Developed and maintained by Olivier Le Goaër and Adel Noureddine.<br>Previous contributors: Fares Bouaffar (initial author), Pierre-Antoine Larguet, Alex Striedelmeyer, Julien Desprez, Nathan Lorit.</p><p>Licensed under the GNU GPL v3.0 only (GPL-3.0-only).<br>Copyright (c) 2021-2025, Université de Pau et des Pays de l'Adour.</p><p><a href=\"https://github.com/powdroid-project/powdroid\">github.com/powdroid-project/powdroid</a></p>",
+        "about_text": "<p><b>PowDroid {version}</b> is an off-device energy profiler for Android.</p><p>Developed and maintained by Olivier Le Goaër and Adel Noureddine.<br>Previous contributors: Fares Bouaffar (initial author), Pierre-Antoine Larguet, Alex Striedelmeyer, Julien Desprez, Nathan Lorit.</p><p>Licensed under the GNU GPL v3.0 only (GPL-3.0-only).<br>Copyright (c) 2021-2026, Université de Pau et des Pays de l'Adour.</p><p><a href=\"https://github.com/powdroid-project/powdroid\">github.com/powdroid-project/powdroid</a></p>",
         "busy_quit": "Data is still being collected from the device. Quit anyway?"
     },
     "checks": {
@@ -37,7 +37,7 @@
         "step_replug_hint": "Battery data will be collected as soon as the phone is connected.",
         "step_processing": "Collecting data",
         "processing_offset": "Reading device clock…",
-        "processing_bugreport": "Generating the bugreport (this can take a few minutes)…",
+        "processing_dump": "Reading battery statistics…",
         "processing_parse": "Computing energy metrics…",
         "step_error": "Something went wrong",
         "retry": "Retry",
@@ -49,20 +49,22 @@
         "duration": "Duration",
         "energy": "Total energy",
         "mean_power": "Average power",
-        "peak_power": "Peak power",
+        "mean_current": "Average current",
         "charge": "Consumed charge",
         "voltage": "Voltage",
-        "tab_energy": "Energy",
         "tab_cumulative": "Cumulative energy",
         "tab_power": "Power and components",
         "tab_data": "Data",
-        "filter": "Filter rows (e.g. an app name)…",
+        "filter": "Filter by app or wakelock name…",
         "open_folder": "Open folder",
         "export_html": "Export HTML",
         "exported": "HTML report written to {path}",
         "new_recording": "New recording",
         "time": "Time",
-        "load_error": "Could not read the report: {error}",
-        "empty": "This report contains no data."
+        "empty": "This report contains no data.",
+        "level": "Battery level",
+        "coverage": "Measured time",
+        "coverage_tooltip": "Share of the session with a known current (not plugged in).",
+        "load_error": "Could not open the report: {error}"
     }
 }

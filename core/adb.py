@@ -34,18 +34,18 @@ def is_available():
     return shutil.which("adb") is not None
 
 
-def _run(args, serial=None, timeout=30):
+def _run(args, serial=None, timeout=30, stdout=subprocess.PIPE):
+    """Run an adb command and return its output (unless stdout is redirected, e.g. to a file)."""
     cmd = ["adb"] + (["-s", serial] if serial else []) + list(args)
     try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout, errors="replace"
-        )
+        result = subprocess.run(cmd, stdout=stdout, stderr=subprocess.PIPE, timeout=timeout,
+                                text=True, errors="replace")
     except FileNotFoundError:
         raise AdbError("adb not found in PATH") from None
     except subprocess.TimeoutExpired:
         raise AdbError(f"'{' '.join(cmd)}' timed out after {timeout}s") from None
     if result.returncode != 0:
-        message = (result.stderr or result.stdout).strip()
+        message = (result.stderr or result.stdout or "").strip()
         raise AdbError(f"'{' '.join(cmd)}' failed: {message}")
     return result.stdout
 
@@ -106,13 +106,35 @@ def prepare(serial):
     _run(["shell", "dumpsys", "batterystats", "--enable", "full-wake-history"], serial=serial)
 
 
-def device_time_ms(serial):
-    """Current device wall-clock time in ms, used to correct host/device clock skew."""
-    out = _run(["shell", "date", "+%s%N"], serial=serial).strip()
-    if out.isdigit() and len(out) > 13:  # nanoseconds supported
-        return int(out) // 1_000_000
-    return int(out[:10]) * 1000 + 500  # seconds only: centre the rounding error
+def clock_offset_ms(serial):
+    """Device clock minus host clock, in ms, compensating for the adb round trip.
+
+    Uses nanosecond `date` output when the device supports it. Otherwise `date +%s` only
+    has 1 s resolution, so the moment its value ticks over is timed instead.
+    """
+    def sample(fmt):
+        before = time.time()
+        out = _run(["shell", "date", fmt], serial=serial).strip()
+        return out, (before + time.time()) / 2 * 1000  # host time at the middle of the call
+
+    out, host_ms = sample("+%s%N")
+    if out.isdigit() and len(out) > 13:
+        return round(int(out) / 1_000_000 - host_ms)
+    previous = out[:10]  # the seconds, followed by an unsupported "%N"
+    deadline = time.time() + 2.5
+    while time.time() < deadline:
+        out, host_ms = sample("+%s")
+        if out != previous and out.isdigit():
+            return round(int(out) * 1000 - host_ms)
+        previous = out
+    return round(int(out) * 1000 + 500 - host_ms)  # adb too slow to see the tick: ±0.5 s
 
 
-def bugreport(serial, path, timeout=900):
-    _run(["bugreport", str(path)], serial=serial, timeout=timeout)
+def dump_batterystats(serial, path, timeout=300):
+    """Save the checkin-format battery statistics (including history since the last reset).
+
+    `-c` prints the checkin format with the history; unlike `--checkin` it neither commits
+    nor resets the statistics. exec-out keeps the output byte-exact (no CRLF translation).
+    """
+    with open(path, "wb") as out:
+        _run(["exec-out", "dumpsys", "batterystats", "-c"], serial=serial, timeout=timeout, stdout=out)
