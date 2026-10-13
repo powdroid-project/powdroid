@@ -75,7 +75,14 @@ class History:
 
     @property
     def has_coulomb(self):
-        return any(iv.value > 0 for iv in self.intervals["charge_mah"])
+        """Whether the battery reports its coulomb counter.
+
+        Phones without one log nothing or a constant 0. Some fuel gauges report it with an
+        offset that can make it negative: only its changes are used, so any counter that
+        moves counts.
+        """
+        values = {iv.value for iv in self.intervals["charge_mah"]}
+        return len(values) > 1 or any(v > 0 for v in values)
 
 
 @dataclass

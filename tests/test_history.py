@@ -54,6 +54,14 @@ class HistoryTest(unittest.TestCase):
     def test_no_coulomb_counter(self):
         h = history.parse_history(f"9,h,0:RESET:TIME:{T0}\n9,h,0,Bcc=0,Bv=4000\n9,h,1000,Bv=3999\n")
         self.assertFalse(h.has_coulomb)
+        h = history.parse_history(f"9,h,0:RESET:TIME:{T0}\n9,h,0,Bcc=-2147483,Bv=4000\n")
+        self.assertFalse(h.has_coulomb)
+
+    def test_negative_coulomb_counter(self):
+        # Offset counters can be negative: they still count as long as they move.
+        h = history.parse_history(f"9,h,0:RESET:TIME:{T0}\n9,h,0,Bcc=-2\n9,h,1000,Bcc=-3\n")
+        self.assertTrue(h.has_coulomb)
+        self.assertEqual(spans(h, "charge_mah"), [(0, 1000, -2), (1000, 1000, -3)])
 
     def test_no_history(self):
         with self.assertRaises(history.HistoryError):

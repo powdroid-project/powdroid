@@ -1,4 +1,5 @@
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -75,8 +76,19 @@ class SessionTest(unittest.TestCase):
 
     def test_no_coulomb_counter(self):
         text = f"9,h,0:RESET:TIME:{T0}\n9,h,0,Bv=4000\n9,h,60000,Bv=3990\n"
-        with self.assertRaises(session.NoDataError):
+        with self.assertRaisesRegex(session.NoDataError, "has no charge counter.*dump.txt"):
             self.run_process(text, 0, 60000)
+        text = f"9,h,0:RESET:TIME:{T0}\n9,h,0,Bv=4000,Bcc=0\n9,h,60000,Bv=3990\n"
+        with self.assertRaisesRegex(session.NoDataError, "stays at 0 mAh"):
+            self.run_process(text, 0, 60000)
+
+    def test_negative_coulomb_counter(self):
+        # A counter with a negative offset gives the same results: only its changes matter.
+        shifted = re.sub(r"Bcc=(\d+)", lambda m: f"Bcc={int(m.group(1)) - 5000}", HISTORY)
+        expected, result = self.run_process(HISTORY, 0, 70000), self.run_process(shifted, 0, 70000)
+        self.assertEqual([r["current_ma"] for r in result.rows], [r["current_ma"] for r in expected.rows])
+        self.assertEqual(result.summary.energy_j, expected.summary.energy_j)
+        self.assertEqual(result.rows[0]["charge_mah"], -2000)
 
     def test_no_data_in_window(self):
         with self.assertRaises(session.NoDataError):

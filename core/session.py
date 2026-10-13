@@ -126,8 +126,12 @@ def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_
     """
     hist = history.parse_file(dump_path, end_ms=dump_ms)
     if not hist.has_coulomb:
-        raise NoDataError("This device does not report its battery coulomb counter, "
-                          "so its energy consumption cannot be measured.")
+        values = {iv.value for iv in hist.intervals["charge_mah"]}
+        found = (f"its charge counter stays at {values.pop()} mAh" if values
+                 else "its battery history has no charge counter")
+        raise NoDataError(f"This device does not report its battery coulomb counter ({found}), "
+                          "so its energy consumption cannot be measured. "
+                          f"The battery statistics are saved in {dump_path}.")
     measured = unplugged_span(hist, start_ms, stop_ms)
     rows = metrics.compute_rows(hist, *measured)
     summary = metrics.summarize(rows)
