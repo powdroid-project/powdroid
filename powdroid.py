@@ -22,6 +22,9 @@ def main():
     parser.add_argument("-s", "--serial", help="device serial, when several devices are connected")
     parser.add_argument("-v", "--verbose", action="store_true", help="print more details")
     parser.add_argument("-t", "--traceback", action="store_true", help="print the traceback on errors")
+    parser.add_argument("--debug", nargs="?", const="", metavar="FILE",
+                        help="write a detailed log (adb commands and answers, data read, errors) to "
+                             "FILE, by default DIR/logs/PowDroid_debug_<date>.log, to attach to bug reports")
     parser.add_argument("--version", action="version", version=f"PowDroid {__version__}")
     args = parser.parse_args()
 
@@ -31,12 +34,22 @@ def main():
         parser.error(f"invalid output format: {', '.join(invalid) or args.output!r} (use csv, html or csv,html)")
 
     from cli.cli import main as cli_main
+    from core import debug
 
+    if args.debug is not None:
+        try:
+            debug.enable(args.debug or debug.default_path(args.dir))
+        except OSError as e:
+            parser.error(f"cannot write the debug log: {e}")
     try:
         return cli_main(formats, args.dir, args.serial, args.verbose, args.traceback)
     except KeyboardInterrupt:
         print("\n[PowDroid] Interrupted.")
+        debug.logger.info("Interrupted by the user")
         return 130
+    finally:
+        if debug.enabled():
+            print(f"[PowDroid] Debug log written to {debug.log_path()}: attach it to your bug report.")
 
 
 if __name__ == "__main__":

@@ -23,6 +23,10 @@
         "open_report": "Open a CSV report…",
         "output_dir": "Output folder:",
         "change": "Change…",
+        "debug": "Debug log",
+        "debug_tooltip": "Write a detailed log of what PowDroid does (adb commands and answers, data read, errors) to attach to a bug report. It contains your device's serial number and model and paths on this computer.",
+        "debug_open": "Open folder",
+        "debug_error": "Could not write the debug log: {error}",
         "instructions_title": "Before you start",
         "instructions": "<ol><li>Enable <b>USB debugging</b> in the developer options and connect your phone.</li><li>Disable Battery Saver and screen timeout; set brightness and volume to 50%.</li><li>Close running apps and background services.</li><li>Click <b>Start recording</b>, unplug the phone and run your scenario for at least 5 minutes.</li><li>Plug the phone back in to collect the results.</li></ol>"
     },

@@ -41,6 +41,15 @@ On your phone a prompt should appear asking for permission for debugging. If the
 
 Battery data is read with `adb shell dumpsys batterystats -c` (a few seconds) and parsed directly in Python; earlier versions needed the Go runtime, battery-historian and a slow `adb bugreport`.
 
+### Reporting a problem: the debug log
+
+When PowDroid fails with your phone or computer, record a session with the debug log on and attach the log to your [issue](https://github.com/powdroid-project/powdroid/issues):
+- CLI: add `--debug` (or `--debug FILE` to choose the file). The log is written to `DIR/logs/PowDroid_debug_<date>.log` and its path is printed at the end.
+- GUI: tick *Debug log* at the bottom of the home page, then *Open folder* shows the log. The option is remembered: restart PowDroid to also log its startup.
+
+The log contains the system, Python and adb versions, every adb command with its answer and duration, device details (`getprop`, `dumpsys battery`), a summary of the battery statistics read, the session times and every error with its traceback.
+It contains your device's serial number and model and paths on your computer: review it before posting it publicly. The battery statistics in `dump/` are also useful to reproduce a problem.
+
 ### Output files (format v3)
 
 Each session produces, in the output folder:

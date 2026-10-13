@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest import mock
 
-from core import adb, metrics, session
+from core import adb, debug, metrics, session
 
 FAKE_ADB = Path(__file__).with_name("fake_adb.py")
 SESSION_S = 1.5
@@ -71,6 +71,31 @@ class EndToEndTest(unittest.TestCase):
         self.assertTrue(known)
         for current in known:  # 1 mAh every 2 steps of 100 ms
             self.assertAlmostEqual(current, 18000, delta=1)
+
+    def test_debug_log(self):
+        path = debug.enable(self.dir / "debug.log")
+        self.addCleanup(debug.disable)
+        self.record_session()
+        adb._polled.clear()
+        for _ in range(3):  # polled commands are only logged when their answer changes
+            adb.list_devices(poll=True)
+        (self.dir / "device" / "state").unlink()
+        adb.list_devices(poll=True)
+        debug.disable()
+        self.assertIsNone(debug.log_path())
+        adb.list_devices()  # not logged any more
+        log = path.read_text(encoding="utf-8")
+        for expected in ("debug log, started", "adb found in PATH", "Android Debug Bridge version",
+                         "Device diagnostics, before the session", "getprop $p",
+                         "shell dumpsys batterystats --reset: exit code 0", "Clock offset: ",
+                         "Battery statistics transferred: ", "lines by kind: h ", "| 9,0,i,vers",
+                         "Battery history: ", "charge counter: ", "rows; summary: ", "Written ",
+                         "Debug log stopped."):
+            self.assertIn(expected, log)
+        polled = log.split("Written ")[-1]
+        self.assertEqual(polled.count("adb devices: exit code 0"), 2)
+        self.assertIn("(the previous answer came 3 times)", polled)
+        self.assertNotIn("Running adb devices", polled)
 
     def test_clock_offset_with_seconds_only_date(self):
         with mock.patch.dict(os.environ, FAKE_ADB_SECONDS_ONLY="1"):

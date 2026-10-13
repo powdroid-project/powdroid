@@ -1,5 +1,6 @@
 """Record page: unplug → record → replug → collect, as an explicit state machine."""
 
+import logging
 from datetime import datetime
 from enum import Enum, auto
 
@@ -34,6 +35,8 @@ STATE_UI = {
     State.ERROR: ("step_error", None, "remove.png"),
 }
 CENTER = Qt.AlignmentFlag.AlignCenter
+
+logger = logging.getLogger("powdroid.gui")
 
 
 class RecordPage(QWidget):
@@ -107,6 +110,7 @@ class RecordPage(QWidget):
         if self.state is None:
             return  # not recording
         connected = device is not None and device.ready and device.serial == self.device.serial
+        logger.debug("Device %s while %s", "connected" if connected else "disconnected", self.state.name)
         if self.state == State.WAIT_UNPLUG and not connected:
             self.start_time = datetime.now()
             self.elapsed.start()
@@ -119,6 +123,7 @@ class RecordPage(QWidget):
     # -- transitions ------------------------------------------------------
 
     def _set_state(self, state):
+        logger.info("Recording page: %s", state.name)
         self.state = state
         current = STEPS.index(state) if state in STEPS else STEPS.index(State.PROCESSING)
         for i, step in enumerate(self.step_labels):
@@ -159,6 +164,7 @@ class RecordPage(QWidget):
 
     def _stop_recording(self):
         self.stop_time = datetime.now()
+        logger.info("Recording from %s to %s", self.start_time, self.stop_time)
         self._update_timer()
         self._set_state(State.WAIT_REPLUG)
 
@@ -183,6 +189,7 @@ class RecordPage(QWidget):
         self._set_state(State.ERROR)
 
     def _cancel(self):
+        logger.info("Recording cancelled")
         self.tick.stop()
         self.state = None
         self.cancelled.emit()

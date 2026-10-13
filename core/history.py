@@ -17,11 +17,15 @@ Google's battery-historian parser:
 Metric names are the PowDroid CSV column names.
 """
 
+import logging
 import re
+from collections import Counter, deque
 from dataclasses import dataclass, field
 from itertools import accumulate
 
-from core import PowDroidError
+from core import PowDroidError, debug
+
+logger = logging.getLogger("powdroid.history")
 
 H = "9,h,"
 HSP = "9,hsp,"
@@ -242,6 +246,8 @@ def parse_lines(lines, end_ms=None):
     history.end_ms = builder.now
     for intervals in history.intervals.values():
         intervals.sort(key=lambda iv: (iv.start, iv.end))
+    if logger.isEnabledFor(logging.DEBUG):
+        _log_summary(records, pool, history)
     return history
 
 
@@ -250,5 +256,65 @@ def parse_history(text):
 
 
 def parse_file(path, end_ms=None):
+    if logger.isEnabledFor(logging.DEBUG):
+        _log_file(path)
     with open(path, encoding="utf-8", errors="replace") as f:
         return parse_lines(f, end_ms)
+
+
+def _log_summary(records, pool, history):
+    """Debug log: what the parsed history contains, e.g. to see why a device gives no data."""
+    tags = Counter(record.tag for record in records if record.tag)
+    keys = Counter(m.group(2) for record in records for item in record.items
+                   for m in [_ITEM_RE.match(item)] if m)
+    charges = sorted({iv.value for iv in history.intervals["charge_mah"]})
+    logger.debug(
+        "Battery history: %d records (%s), %d without a known time (ignored), %d strings in the pool\n"
+        "  from %s to %s%s\n"
+        "  state changes by key: %s\n"
+        "  intervals by metric: %s\n"
+        "  charge counter: %s",
+        len(records), ", ".join(f"{tag} {n}" for tag, n in tags.items()) or "no TIME or RESET",
+        sum(record.time is None for record in records), len(pool),
+        debug.ms(history.start_ms), debug.ms(history.end_ms),
+        f", buffer overflow at {debug.ms(history.overflow_ms)}" if history.overflow_ms is not None else "",
+        ", ".join(f"{key} {n}" for key, n in keys.most_common()) or "none",
+        ", ".join(f"{metric} {len(ivs)}" for metric, ivs in history.intervals.items() if ivs) or "none",
+        f"{len(charges)} distinct values from {charges[0]} to {charges[-1]} mAh" if charges else "no readings")
+
+
+def _log_file(path, examples=5):
+    """Debug log: the kinds of lines of a dump and a few of them, to spot unexpected output."""
+    kinds, unexpected, versions, crlf = Counter(), [], [], 0
+    first, last = [], deque(maxlen=examples)
+    with open(path, encoding="utf-8", errors="replace", newline="") as f:
+        for line in f:
+            crlf += line.endswith("\r\n")
+            line = line.rstrip("\r\n")
+            parts = line.split(",", 4)
+            if line.startswith(H):
+                kinds["h"] += 1
+                if len(first) < examples:
+                    first.append(line)
+                last.append(line)
+            elif line.startswith(HSP):
+                kinds["hsp"] += 1
+            elif len(parts) >= 4 and parts[0].isdigit():  # e.g. 9,0,i,vers,...: section "i,vers"
+                kinds[f"{parts[2]},{parts[3]}"] += 1
+                if parts[3] == "vers":
+                    versions.append(line)
+            elif not line:
+                kinds["blank"] += 1
+            else:
+                kinds["unexpected"] += 1
+                if len(unexpected) < examples:
+                    unexpected.append(line)
+    lines = [f"Dump {path}: {sum(kinds.values())} lines ({crlf} ending with CR LF)",
+             "  lines by kind: " + (", ".join(f"{kind} {n}" for kind, n in kinds.most_common()) or "none"),
+             debug.indent("version", "\n".join(versions) or "none")]
+    if first:
+        lines.append(debug.indent("first history lines", "\n".join(first)))
+        lines.append(debug.indent("last history lines", "\n".join(last)))
+    if unexpected:
+        lines.append(debug.indent(f"first unexpected lines (of {kinds['unexpected']})", "\n".join(unexpected)))
+    logger.debug("\n".join(lines))

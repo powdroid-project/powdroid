@@ -1,16 +1,21 @@
 """Interactive command-line workflow: prepare, record, collect, process."""
 
 import itertools
+import logging
 import sys
 import threading
 import traceback
 from datetime import datetime
 
-from core import PowDroidError, adb, checks, metrics, session
+from core import PowDroidError, adb, checks, debug, metrics, session
+
+logger = logging.getLogger("powdroid.cli")
 
 
-def log(message):
+def log(message, level=logging.INFO):
+    """Print a message, and write it to the debug log as context for what follows."""
     print(f"[PowDroid] {message}")
+    logger.log(level, message)
 
 
 def run_checks():
@@ -58,12 +63,15 @@ def main(output_formats, out_dir, serial=None, verbose=False, show_traceback=Fal
     print(r" |  __/ (_) \ V  V /| |_| | | | (_) | | (_| |")
     print(r" |_|   \___/ \_/\_/ |____/|_|  \___/|_|\__,_|")
     print()
+    if debug.enabled():
+        log(f"Writing a debug log to {debug.log_path()}")
     if not run_checks():
         return 1
     try:
         return _record(output_formats, out_dir, serial, verbose)
     except (PowDroidError, OSError) as e:
-        log(f"ERROR | {e}")
+        log(f"ERROR | {e}", logging.ERROR)
+        logger.debug("Traceback:", exc_info=True)
         if show_traceback:
             traceback.print_exc()
         return 1
@@ -107,6 +115,6 @@ def _record(output_formats, out_dir, serial, verbose):
     log(f"Energy {figures['energy']}, average power {figures['mean_power']} over "
         f"{figures['duration']} (measured time {figures['coverage']}).")
     for warning in result.warnings:
-        log(f"WARNING | {warning}")
+        log(f"WARNING | {warning}", logging.WARNING)
     log("All tasks completed. Thank you for using PowDroid!")
     return 0

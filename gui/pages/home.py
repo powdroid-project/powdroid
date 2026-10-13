@@ -2,8 +2,11 @@
 
 from html import escape
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QFileDialog, QGridLayout, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtCore import QSignalBlocker, Qt, QUrl, pyqtSignal
+from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtWidgets import (
+    QCheckBox, QFileDialog, QGridLayout, QHBoxLayout, QPushButton, QVBoxLayout, QWidget,
+)
 
 from gui.i18n import t
 from gui.theme import set_role
@@ -14,6 +17,7 @@ class HomePage(QWidget):
     start_requested = pyqtSignal()
     open_report_requested = pyqtSignal(str)
     output_dir_changed = pyqtSignal(str)
+    debug_toggled = pyqtSignal(bool)
 
     def __init__(self, output_dir, parent=None):
         super().__init__(parent)
@@ -59,6 +63,20 @@ class HomePage(QWidget):
         layout.addLayout(row)
         self.set_output_dir(output_dir)
 
+        # Debug log
+        self.debug_check = QCheckBox(t("home.debug"))
+        self.debug_check.setToolTip(t("home.debug_tooltip"))
+        self.debug_check.toggled.connect(self.debug_toggled)
+        self.debug_label = ElidedLabel(role="muted")
+        self.debug_open = QPushButton(t("home.debug_open"))
+        self.debug_open.clicked.connect(self._open_debug_folder)
+        row = QHBoxLayout()
+        row.addWidget(self.debug_check)
+        row.addWidget(self.debug_label, 1)
+        row.addWidget(self.debug_open)
+        layout.addLayout(row)
+        self.set_debug_log(None)
+
         self.start_button = QPushButton(t("home.start"))
         set_role(self.start_button, "primary")
         self.start_button.clicked.connect(self.start_requested)
@@ -79,6 +97,18 @@ class HomePage(QWidget):
         if path:
             self.set_output_dir(path)
             self.output_dir_changed.emit(path)
+
+    def set_debug_log(self, path):
+        """Show the debug log being written (None: no log)."""
+        self.debug_path = path
+        with QSignalBlocker(self.debug_check):
+            self.debug_check.setChecked(path is not None)
+        self.debug_label.setFullText(str(path or ""))
+        self.debug_open.setVisible(path is not None)
+
+    def _open_debug_folder(self):
+        if self.debug_path:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.debug_path.parent)))
 
     def _open_report(self):
         path, _ = QFileDialog.getOpenFileName(self, t("home.open_report"), self.output_dir, "CSV (*.csv)")

@@ -1,10 +1,14 @@
 """Background threads: every adb call runs here, never on the UI thread."""
 
+import logging
+import threading
 import traceback
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from core import PowDroidError, adb, checks
+
+logger = logging.getLogger("powdroid.gui")
 
 
 class DeviceWatcher(QThread):
@@ -21,17 +25,18 @@ class DeviceWatcher(QThread):
         self.paused = paused
 
     def run(self):
+        threading.current_thread().name = "DeviceWatcher"  # for the debug log
         last = ()
         while not self.isInterruptionRequested():
             if not self.paused:
                 try:
-                    devices = adb.list_devices()
+                    devices = adb.list_devices(poll=True)
                     key = tuple((d.serial, d.state) for d in devices)
                     if key != last:
                         last = key
                         self.device_changed.emit(adb.find_device(devices=devices))
                 except adb.AdbError:
-                    pass
+                    pass  # in the debug log
             for _ in range(10):
                 if self.isInterruptionRequested():
                     return
@@ -60,15 +65,21 @@ class Task(QThread):
         self.finished.connect(self.deleteLater)
 
     def run(self):
+        name = getattr(self.func, "__qualname__", repr(self.func))
+        threading.current_thread().name = f"Task {name}"  # for the debug log
+        logger.debug("Started")
         try:
             kwargs = {"report": self.progress.emit} if self.with_progress else {}
             result = self.func(*self.args, **kwargs)
         except (PowDroidError, OSError) as e:
+            logger.error("Failed: %s", e, exc_info=True)
             self.failed.emit(str(e))
         except Exception as e:  # A bug: keep the traceback in the console.
+            logger.critical("Crashed", exc_info=True)
             traceback.print_exc()
             self.failed.emit(f"{type(e).__name__}: {e}")
         else:
+            logger.debug("Done")
             self.succeeded.emit(result)
 
 

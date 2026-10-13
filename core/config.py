@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 PATH = Path.home() / ".powdroid.json"
-DEFAULTS = {"language": "en", "theme": "dark", "output_dir": str(Path.home() / "PowDroid")}
+DEFAULTS = {"language": "en", "theme": "dark", "output_dir": str(Path.home() / "PowDroid"), "debug": False}
 
 
 def load():

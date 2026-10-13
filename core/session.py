@@ -6,11 +6,14 @@ PowDroid_<date>.html.
 """
 
 import json
+import logging
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from core import PowDroidError, __version__, adb, history, html_report, metrics
+from core import PowDroidError, __version__, adb, debug, history, html_report, metrics
+
+logger = logging.getLogger("powdroid.session")
 
 MAX_UNCERTAINTY_PCT = 5  # i.e. at least 20 mAh consumed, given the 1 mAh counter resolution
 
@@ -41,8 +44,11 @@ def collect(device, start, stop, out_dir, html=False, report=lambda step: None):
     device clock offset measured now. report(step) is called with "offset", "dump"
     and "parse" as the work progresses. Returns a Result.
     """
+    logger.info("Collecting the session recorded on %s from %s to %s (computer time) into %s",
+                device.serial, start, stop, out_dir)
     report("offset")
     offset = adb.clock_offset_ms(device.serial)
+    adb.log_diagnostics(device.serial, "after the session")
     to_device_ms = lambda dt: int(dt.timestamp() * 1000) + offset  # noqa: E731
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     out_dir = Path(out_dir).expanduser()
@@ -124,6 +130,8 @@ def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_
 
     start_ms, stop_ms and dump_ms (when the dump was taken) are in device time.
     """
+    logger.info("Processing %s: session from %s to %s, dump taken at %s (device time)",
+                dump_path, debug.ms(start_ms), debug.ms(stop_ms), debug.ms(dump_ms))
     hist = history.parse_file(dump_path, end_ms=dump_ms)
     if not hist.has_coulomb:
         values = {iv.value for iv in hist.intervals["charge_mah"]}
@@ -133,8 +141,11 @@ def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_
                           "so its energy consumption cannot be measured. "
                           f"The battery statistics are saved in {dump_path}.")
     measured = unplugged_span(hist, start_ms, stop_ms)
+    if measured != (start_ms, stop_ms):
+        logger.info("Left out while plugged in: measuring from %s to %s", *map(debug.ms, measured))
     rows = metrics.compute_rows(hist, *measured)
     summary = metrics.summarize(rows)
+    logger.info("%d rows; summary: %s", len(rows), asdict(summary))
     if not summary.measured_s:
         raise NoDataError("No battery data found for the recorded session. Make sure the phone "
                           "stays unplugged and the session lasts long enough for the battery charge to drop.")
@@ -159,11 +170,17 @@ def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_
     result.json_path.write_text(json.dumps(session, indent=2), encoding="utf-8")
     if html:
         result.html_path = html_report.write(result)
+    for warning in result.warnings:
+        logger.warning(warning)
+    for path in (result.csv_path, result.json_path, result.html_path):
+        if path:
+            logger.info("Written %s (%d bytes)", path, path.stat().st_size)
     return result
 
 
 def load(csv_path):
     """Read a session back from its CSV, with the warnings of its JSON file when there is one."""
+    logger.info("Loading %s", csv_path)
     rows = metrics.read_csv(csv_path)
     result = Result(Path(csv_path), rows, metrics.summarize(rows))
     try:

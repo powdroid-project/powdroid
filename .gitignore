@@ -1,4 +1,5 @@
 __pycache__/
 dump
+logs
 .vscode
 .DS_Store
