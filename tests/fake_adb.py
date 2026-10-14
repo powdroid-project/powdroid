@@ -10,6 +10,8 @@ is supported unless $FAKE_ADB_SECONDS_ONLY is set (like older Android versions).
 The simulated battery loses 1 mAh every 2 history steps (of $FAKE_ADB_STEP_MS) while unplugged.
 With $FAKE_ADB_NO_COULOMB set, it has no coulomb counter (it reports 0) and its level drops
 by 1 % (30 mAh) every 3 steps while unplugged instead.
+As on Android 14+, plug changes are written after the record of their step, with a negative
+time delta.
 """
 
 import os
@@ -41,10 +43,11 @@ def history(reset_ms, now_ms, plugs):
              f"9,h,0:RESET:TIME:{reset_ms}",
              f"9,h,0,Bl=90,Bv=4200,Bcc={0 if NO_COULOMB else 3000},Bt=281,Sb=2,+S,+Etp=0,+W,+BP"]
     t, charge, level, i, plugged = reset_ms, 3000, 90, 0, True
+    printed = t  # time of the last record written: the deltas are relative to it
     while t + STEP_MS < now_ms:
         i += 1
         t += STEP_MS
-        items = []
+        items, plug_items = [], []
         if i % 2 == 0:  # the charge changes according to the state during the last step
             charge += 1 if plugged else -1
             items += ([] if NO_COULOMB else [f"Bcc={charge}"]) + [f"Bv={4200 - i // 2}"]
@@ -54,7 +57,7 @@ def history(reset_ms, now_ms, plugs):
         for at, state in plugs:
             if t - STEP_MS < at <= t:
                 plugged = state
-                items.append("+BP" if state else "-BP")
+                plug_items.append("+BP" if state else "-BP")
         if i % 10 == 5:
             items += ["-S", "-Etp=0"]
         if i % 10 == 0:
@@ -69,7 +72,11 @@ def history(reset_ms, now_ms, plugs):
             items.append("-Ewl=2")
         if i == 20 and not NO_COULOMB:
             items.append("Bl=89")
-        lines.append(f"9,h,{STEP_MS}" + "".join("," + item for item in items))
+        lines.append(f"9,h,{t - printed}" + "".join("," + item for item in items))
+        printed = t
+        if plug_items:  # written late, stamped a little before the step's record
+            lines.append(f"9,h,{-(STEP_MS // 2)}," + ",".join(plug_items))
+            printed = t - STEP_MS // 2
     return "\n".join(lines) + "\n9,0,l,bt,0,0,0\n9,0,l,pws,3000,0,0,0\n"
 
 

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from core import metrics, session
-from tests.fixtures import HISTORY, LEVEL_HISTORY, T0
+from tests.fixtures import HISTORY, LEVEL_HISTORY, OUT_OF_ORDER_HISTORY, T0
 
 
 class SessionTest(unittest.TestCase):
@@ -112,6 +112,19 @@ class SessionTest(unittest.TestCase):
         self.assertEqual([r["current_ma"] for r in result.rows], [r["current_ma"] for r in expected.rows])
         self.assertEqual(result.summary.energy_j, expected.summary.energy_j)
         self.assertEqual(result.rows[0]["charge_mah"], -2000)
+
+    def test_unplug_written_out_of_order(self):
+        # The unplug record has a negative time delta (Android 14+): it must not be lost, or
+        # the phone looks plugged in during the whole session.
+        result = self.run_process(OUT_OF_ORDER_HISTORY, 0, 160000)
+        data = json.loads(result.json_path.read_text())
+        self.assertEqual((data["start_ms"] - T0, data["stop_ms"] - T0), (5000, 160000))
+        self.assertEqual(result.summary.measured_s, 120)
+        self.assertAlmostEqual(result.summary.charge_mah, 41)
+
+    def test_plugged_in_during_the_whole_session(self):
+        with self.assertRaisesRegex(session.NoDataError, "stayed plugged in during the whole session"):
+            self.run_process(HISTORY, 46000, 54000)  # plugged in from 45 s to 55 s
 
     def test_no_data_in_window(self):
         with self.assertRaises(session.NoDataError):

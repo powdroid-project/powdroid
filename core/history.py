@@ -7,6 +7,11 @@ previous record (in ms), then lists the states that changed, for example:
     9,h,0:RESET:TIME:1700000000000           statistics reset, absolute time
     9,h,1500,Bv=4012,+S,+Etp=3               1.5 s later: voltage, screen on, top app 3
 
+Since Android 14, a record can be written just after a later one, so its time delta is
+negative (e.g. "9,h,-20,-BP": unplugged 20 ms before the previous record). Each record
+lists the changes since the previous line, so the records are applied in their order,
+the out-of-order ones at the time of the previous record.
+
 Only the metrics PowDroid reports on are extracted, following the semantics of
 Google's battery-historian parser:
 
@@ -59,7 +64,7 @@ BOOL_METRICS = {
 SERVICE_METRICS = {"Etp": "top_app", "Ewl": "wakelock"}
 METRICS = sorted(set(INT_METRICS.values()) | set(BOOL_METRICS.values()) | set(SERVICE_METRICS.values()))
 
-_RECORD_RE = re.compile(r"^(\d+)(?::(RESET:TIME|TIME|START|SHUTDOWN|\*OVERFLOW\*)(?::(\d+))?)?(.*)$")
+_RECORD_RE = re.compile(r"^(-?\d+)(?::(RESET:TIME|TIME|START|SHUTDOWN|\*OVERFLOW\*)(?::(\d+))?)?(.*)$")
 _ITEM_RE = re.compile(r"^([+-]?)(\w+)(?:=(.*))?$")
 _POOL_RE = re.compile(r"^(\d+),(-?\d+),(.*)$")
 
@@ -93,7 +98,7 @@ class History:
 
 @dataclass
 class _Record:
-    delta: int  # ms since the previous record
+    delta: int  # ms since the previous record (negative when written out of order)
     tag: str = None  # RESET:TIME, TIME, START, SHUTDOWN, *OVERFLOW* or None for state changes
     clock: int = None  # absolute time given by RESET:TIME / TIME records
     items: list = field(default_factory=list)  # state changes, e.g. ["Bv=4012", "+S"]
@@ -176,7 +181,10 @@ class _Builder:
             self.close_all()
         if record.time is None:
             return True  # No absolute time known: the record cannot be placed on the timeline.
-        self.now = record.time
+        if self.now is None or record.tag in ("START", "RESET:TIME"):
+            self.now = record.time
+        else:  # never back in time: an out-of-order record is applied after the previous one
+            self.now = max(self.now, record.time)
         if record.tag == "RESET:TIME" or self.history.start_ms is None:
             self.history.start_ms = self.now
         for item in record.items:
@@ -279,16 +287,18 @@ def parse_file(path, end_ms=None):
 def _log_summary(records, pool, history):
     """Debug log: what the parsed history contains, e.g. to see why a device gives no data."""
     tags = Counter(record.tag for record in records if record.tag)
+    late = [-record.delta for record in records if record.delta < 0]
     keys = Counter(m.group(2) for record in records for item in record.items
                    for m in [_ITEM_RE.match(item)] if m)
     charges = sorted({iv.value for iv in history.intervals["charge_mah"]})
     logger.debug(
-        "Battery history: %d records (%s), %d without a known time (ignored), %d strings in the pool\n"
+        "Battery history: %d records (%s), %s, %d without a known time (ignored), %d strings in the pool\n"
         "  from %s to %s%s\n"
         "  state changes by key: %s\n"
         "  intervals by metric: %s\n"
         "  charge counter: %s; battery capacity: %s",
         len(records), ", ".join(f"{tag} {n}" for tag, n in tags.items()) or "no TIME or RESET",
+        f"{len(late)} out of order (up to {max(late)} ms early)" if late else "none out of order",
         sum(record.time is None for record in records), len(pool),
         debug.ms(history.start_ms), debug.ms(history.end_ms),
         f", buffer overflow at {debug.ms(history.overflow_ms)}" if history.overflow_ms is not None else "",
@@ -309,6 +319,10 @@ def _log_file(path, examples=5):
             parts = line.split(",", 4)
             if line.startswith(H):
                 kinds["h"] += 1
+                if not _RECORD_RE.match(line[len(H):]):  # not parsed: listed with the unexpected lines
+                    kinds["h (unreadable)"] += 1
+                    if len(unexpected) < examples:
+                        unexpected.append(line)
                 if len(first) < examples:
                     first.append(line)
                 last.append(line)
@@ -331,5 +345,6 @@ def _log_file(path, examples=5):
         lines.append(debug.indent("first history lines", "\n".join(first)))
         lines.append(debug.indent("last history lines", "\n".join(last)))
     if unexpected:
-        lines.append(debug.indent(f"first unexpected lines (of {kinds['unexpected']})", "\n".join(unexpected)))
+        count = kinds["unexpected"] + kinds["h (unreadable)"]
+        lines.append(debug.indent(f"first unexpected lines (of {count})", "\n".join(unexpected)))
     logger.debug("\n".join(lines))

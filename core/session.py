@@ -168,6 +168,10 @@ def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_
     measured = unplugged_span(hist, start_ms, stop_ms)
     if measured != (start_ms, stop_ms):
         logger.info("Left out while plugged in: measuring from %s to %s", *map(debug.ms, measured))
+    if measured[0] >= measured[1]:
+        raise NoDataError("The battery statistics say the phone stayed plugged in during the whole "
+                          "session, so no energy can be measured. Unplug the phone when the recording "
+                          f"page asks for it. The battery statistics are saved in {dump_path}.")
     rows = metrics.compute_rows(hist, *measured, source)
     summary = metrics.summarize(rows, source.name, source.resolution_mah)
     logger.info("%d rows; summary: %s", len(rows), asdict(summary))

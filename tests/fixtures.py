@@ -57,3 +57,25 @@ LEVEL_HISTORY = f"""\
 #   90000  level 82 %: 30 mAh in 60 s => 1800 mA over [30,90s)
 #  120000  level 81 %: 30 mAh in 30 s => 3600 mA over [90,120s)
 #  150000  plugged in (end of history); [120,150s) unknown (last reading)
+
+# Since Android 14, some records are written a little after a later one, with a negative time
+# delta: here the unplug (as on a Fairphone 6, Android 16).
+OUT_OF_ORDER_HISTORY = f"""\
+9,0,i,vers,36,215,FP6,FP6
+9,h,0:RESET:TIME:{T0}
+9,h,0,Bl=27,Bs=c,Bp=u,Bv=3730,Bcc=1218,+BP
+9,h,5000,+Ewl=1
+9,h,-20,-BP,Bs=d,Bp=n
+9,h,30020,Bcc=1198,Bv=3720
+9,h,60000,Bcc=1175
+9,h,60000,Bcc=1157,-Ewl=1
+9,h,10000,+BP,Bs=c,Bp=u
+"""
+# Timeline (device ms relative to T0):
+#       0  reset, plugged in; 1218 mAh
+#    5000  wakelock
+#    4980  unplugged (written after the 5000 record): applied at 5000
+#   35000  1198 mAh => 1200 mA over [35,95s)
+#   95000  1175 mAh => 1380 mA over [95,155s)
+#  155000  1157 mAh
+#  165000  plugged back in

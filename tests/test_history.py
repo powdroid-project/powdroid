@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from core import history
-from tests.fixtures import HISTORY, LEVEL_HISTORY, T0
+from tests.fixtures import HISTORY, LEVEL_HISTORY, OUT_OF_ORDER_HISTORY, T0
 
 
 def spans(hist, metric):
@@ -68,6 +68,24 @@ class HistoryTest(unittest.TestCase):
         self.assertEqual(history.parse_history(LEVEL_HISTORY).capacity_mah, 3000)
         h = history.parse_history(f"9,h,0:RESET:TIME:{T0}\n9,h,0,Bl=50\n9,0,l,pws,0,0,0,0\n")
         self.assertIsNone(h.capacity_mah)
+
+    def test_records_written_out_of_order(self):
+        # "9,h,-20,-BP": unplugged 20 ms before the previous record, applied right after it.
+        h = history.parse_history(OUT_OF_ORDER_HISTORY)
+        self.assertEqual(spans(h, "plugged"), [(0, 5000, True), (165000, 165000, True)])
+        self.assertEqual(spans(h, "charge_mah")[1:3], [(35000, 95000, 1198), (95000, 155000, 1175)])
+        self.assertEqual(h.end_ms - T0, 165000)
+
+    def test_debug_log_shows_out_of_order_and_unreadable_lines(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "batterystats.txt"
+            path.write_text(OUT_OF_ORDER_HISTORY + "9,h,oops\n")
+            with self.assertLogs("powdroid.history", "DEBUG") as logs:
+                history.parse_file(path)
+        text = "\n".join(logs.output)
+        self.assertIn("1 out of order (up to 20 ms early)", text)
+        self.assertIn("h (unreadable) 1", text)
+        self.assertIn("| 9,h,oops", text)
 
     def test_no_history(self):
         with self.assertRaises(history.HistoryError):
