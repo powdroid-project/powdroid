@@ -36,3 +36,24 @@ HISTORY = f"""\
 #   75000  2995 mAh (end of history)
 # Currents: [0,15s) 240 mA, [15,35s) 360 mA, [35,45s) 360 mA, [45,50s) and [50,65s) unknown
 # (plugged), [65,75s) 720 mA.
+
+# A phone without a coulomb counter (Bcc stays 0): the current comes from the battery level.
+LEVEL_HISTORY = f"""\
+9,0,i,vers,35,200,SP2A,SP2A
+9,h,0:RESET:TIME:{T0}
+9,h,0,Bl=84,Bv=4000,Bcc=0,+BP
+9,h,10000,-BP
+9,h,20000,Bl=83
+9,h,40000,Bl=83,Bv=3990
+9,h,20000,Bl=82
+9,h,30000,Bl=81
+9,h,30000,+BP
+9,0,l,pws,3000,120.5,0,60
+"""
+# Timeline (device ms relative to T0), 1 % = 30 mAh of the 3000 mAh capacity:
+#       0  reset, plugged in; level 84 %: a partial step, left out
+#   10000  unplugged
+#   30000  level 83 % (re-logged at 70000: the same reading)
+#   90000  level 82 %: 30 mAh in 60 s => 1800 mA over [30,90s)
+#  120000  level 81 %: 30 mAh in 30 s => 3600 mA over [90,120s)
+#  150000  plugged in (end of history); [120,150s) unknown (last reading)

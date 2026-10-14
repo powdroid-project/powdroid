@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from core import metrics, session
-from tests.fixtures import HISTORY, T0
+from tests.fixtures import HISTORY, LEVEL_HISTORY, T0
 
 
 class SessionTest(unittest.TestCase):
@@ -74,13 +74,36 @@ class SessionTest(unittest.TestCase):
         warnings = self.run_process(text, 0, 70000).warnings
         self.assertTrue(any("overflowed" in w for w in warnings))
 
-    def test_no_coulomb_counter(self):
+    def test_no_coulomb_counter_nor_capacity(self):
         text = f"9,h,0:RESET:TIME:{T0}\n9,h,0,Bv=4000\n9,h,60000,Bv=3990\n"
-        with self.assertRaisesRegex(session.NoDataError, "has no charge counter.*dump.txt"):
+        with self.assertRaisesRegex(session.NoDataError, "has no charge counter.*capacity.*dump.txt"):
             self.run_process(text, 0, 60000)
         text = f"9,h,0:RESET:TIME:{T0}\n9,h,0,Bv=4000,Bcc=0\n9,h,60000,Bv=3990\n"
         with self.assertRaisesRegex(session.NoDataError, "stays at 0 mAh"):
             self.run_process(text, 0, 60000)
+
+    def test_estimate_from_the_battery_level(self):
+        result = self.run_process(LEVEL_HISTORY, 0, 150000)
+        self.assertEqual(result.summary.current_source, "battery_level")
+        self.assertAlmostEqual(result.summary.charge_mah, 60)
+        self.assertEqual((result.summary.measured_s, result.summary.uncertainty_pct), (90, 50))
+        text = " ".join(result.warnings)
+        self.assertIn("estimated from the battery level drops, counting each 1 % as 30 mAh "
+                      "(of a 3000 mAh design capacity)", text)
+        self.assertIn("Only 60 mAh (2 % of the battery) were measured: with the battery level's 1 % "
+                      "resolution, energy and power are only known to about ±50 %", text)
+        self.assertIn("a level drop of at least 20 % for ±5 %", text)
+        self.assertNotIn("coulomb counter's 1 mAh", text)
+        data = json.loads(result.json_path.read_text())
+        self.assertEqual((data["current_source"], data["battery_capacity_mah"]), ("battery_level", 3000))
+        self.assertEqual(data["charge_update_interval_s"], 40)  # level steps of 60, 30 and 30 s
+        loaded = session.load(result.csv_path)  # the uncertainty needs the source, saved in the JSON
+        self.assertEqual((loaded.summary.current_source, loaded.summary.uncertainty_pct), ("battery_level", 50))
+
+    def test_battery_level_must_drop_twice(self):
+        # Unplugged at 10 s, the level only drops at 30 s before the session stops at 25 s.
+        with self.assertRaisesRegex(session.NoDataError, "level did not drop twice"):
+            self.run_process(LEVEL_HISTORY, 0, 25000)
 
     def test_negative_coulomb_counter(self):
         # A counter with a negative offset gives the same results: only its changes matter.

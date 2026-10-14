@@ -24,6 +24,7 @@ PowDroid only needs Python and adb:
 - Kill running apps and background services
 - Start with the battery below 100 %: right after a full charge, the battery voltage is temporarily higher
 - Record long enough to consume at least 20 mAh (often 5 to 10 minutes): the coulomb counter has a 1 mAh resolution, so this keeps energy and power within ±5 %. PowDroid shows this uncertainty and warns when it is larger
+- Some phones (e.g. the Pixel 3a) do not report their battery coulomb counter: `adb shell dumpsys battery` shows `Charge counter: 0`. PowDroid then warns before recording and estimates the energy from the battery level drops instead, which needs a much longer session: a drop of at least 10 % of the battery for about ±10 %, 20 % for ±5 %
 - Unplug the phone as soon as the recording page asks for it, and plug it back only after stopping
 
 ### Initial configuration
@@ -55,16 +56,17 @@ It contains your device's serial number and model and paths on your computer: re
 Each session produces, in the output folder:
 - `PowDroid_<date>.csv`: one row per interval during which no tracked state changed; the rows cover the whole session. Columns:
   - time: `start_ms`, `end_ms` (device epoch ms), `elapsed_s` (since the session start), `duration_ms`;
-  - battery: `battery_level_pct`, `voltage_mv`, `charge_mah` (coulomb counter), `current_ma`, `power_w`, `energy_j`, `consumed_mah`, `temperature_c`;
+  - battery: `battery_level_pct`, `voltage_mv`, `charge_mah` (coulomb counter, empty on phones without one), `current_ma`, `power_w`, `energy_j`, `consumed_mah`, `temperature_c`;
   - components (0/1): `plugged`, `screen`, `cpu_running`, `wifi`, `wifi_radio`, `mobile_radio`, `gps`, `bluetooth`, `camera`, `video`, `audio`, `flashlight`, `sensor`, `battery_saver`, plus `brightness` (0–4);
   - `top_app` (while the screen is on) and `wakelocks` (all held, `;`-separated).
 
   Empty cells mean unknown. In particular, current, power and energy are left empty while the phone is plugged in, because the coulomb counter then measures charging.
-- `PowDroid_<date>.json`: the device, the requested and measured session start and stop, the clock offset, totals (energy, average power and current, consumed charge, measured time) and warnings about the reliability of the results (phone plugged in, history overflow, too little charge consumed for the 1 mAh counter resolution).
+- `PowDroid_<date>.json`: the device, the requested and measured session start and stop, the clock offset, where the current comes from (`current_source`: `coulomb_counter` or `battery_level`, with `battery_capacity_mah`), totals (energy, average power and current, consumed charge, measured time) and warnings about the reliability of the results (phone plugged in, history overflow, too little charge consumed for the resolution of the readings, estimate from the battery level).
 - `PowDroid_<date>.html` when requested, and the raw `dumpsys` output in `dump/`.
 
 How the figures are obtained:
 - The current comes from the battery coulomb counter: for each reading, the charge drop until the next reading divided by the time in between. The counter has a 1 mAh resolution, so energy and power are known to about ±1 mAh relative to the charge consumed (shown as ± % in the reports). Some phones update the reading only every minute or so: the power is then an average over such periods (PowDroid warns about it).
+- Phones without a coulomb counter only report the battery level. Each 1 % drop then counts as 1 % of the battery's design capacity (from the phone's power profile): the current is that charge divided by the time until the next drop. It is only known between the first and last level drops of the session, has a resolution of 1 % of the capacity (shown as ± %), and is overestimated on a worn battery, whose real capacity is lower than its design capacity.
 - The voltage is interpolated between the phone's readings (except across plugging or unplugging). Power is voltage × current and energy is power × duration, row by row.
 - If the session starts before the phone is unplugged or ends after it is plugged back in, those edges are left out. Plugging in during the session is reported, and those rows have no current, power or energy.
 - Device and computer clocks are aligned when the results are collected, to a few milliseconds.

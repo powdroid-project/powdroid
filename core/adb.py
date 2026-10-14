@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -153,28 +154,52 @@ def wait_for(connected, serial=None):
         time.sleep(1)
 
 
-def log_diagnostics(serial, moment):
+def log_diagnostics(serial, moment, battery=True):
     """In debug mode, log the device details that explain device-specific problems.
 
-    They never stop the session: failures are only logged.
+    battery=False leaves out `dumpsys battery`, when the caller reads it anyway. They never
+    stop the session: failures are only logged.
     """
     if not logger.isEnabledFor(logging.DEBUG):
         return
     logger.info("Device diagnostics, %s", moment)
     props = f"for p in {' '.join(DEBUG_PROPS)}; do echo $p=$(getprop $p); done"
-    for args in (["shell", props], ["shell", "dumpsys", "battery"]):
+    commands = [["shell", props]] + ([["shell", "dumpsys", "battery"]] if battery else [])
+    for args in commands:
         try:
             _run(args, serial=serial)
         except AdbError:
             pass  # in the log
 
 
+def has_coulomb_counter(serial):
+    """Whether the battery reports its coulomb counter, according to `dumpsys battery`.
+
+    Phones without one report a charge counter of 0. Returns None when unknown (older
+    Android versions do not show it, or the command failed).
+    """
+    try:
+        out = _run(["shell", "dumpsys", "battery"], serial=serial)
+    except AdbError:
+        return None  # in the debug log
+    m = re.search(r"^\s*Charge counter:\s*(-?\d+)", out, re.MULTILINE)
+    return None if m is None else int(m.group(1)) != 0
+
+
 def prepare(serial):
-    """Reset battery statistics so the history only covers the coming session."""
-    log_diagnostics(serial, "before the session")
+    """Reset battery statistics so the history only covers the coming session.
+
+    Returns has_coulomb_counter(serial): without the counter, the energy can only be
+    estimated from the battery level, which needs a much longer session.
+    """
+    log_diagnostics(serial, "before the session", battery=False)  # read below in any case
+    coulomb = has_coulomb_counter(serial)
+    if coulomb is False:
+        logger.warning("The battery reports no coulomb counter (charge counter 0)")
     _run(["shell", "am", "kill-all"], serial=serial)
     _run(["shell", "dumpsys", "batterystats", "--reset"], serial=serial)
     _run(["shell", "dumpsys", "batterystats", "--enable", "full-wake-history"], serial=serial)
+    return coulomb
 
 
 def clock_offset_ms(serial):

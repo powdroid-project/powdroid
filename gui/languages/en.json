@@ -36,6 +36,7 @@
         "step_recording": "Recording",
         "step_recording_hint": "Run your test scenario on the phone, then click Stop.",
         "replugged_warning": "The phone is plugged in: charging distorts the measurements. Unplug it until you stop the recording.",
+        "no_coulomb": "This phone does not report its battery coulomb counter: PowDroid will estimate the energy from the battery level drops, which is much less precise. Record a long session: the battery level should drop by at least 10 % (for about ±10 %), or 20 % for ±5 %.",
         "stop": "Stop recording",
         "step_replug": "Plug your device back in",
         "step_replug_hint": "Battery data will be collected as soon as the phone is connected.",
@@ -68,7 +69,7 @@
         "empty": "This report contains no data.",
         "level": "Battery level",
         "coverage": "Measured time",
-        "coverage_tooltip": "Share of the session with a known current (not plugged in).",
+        "coverage_tooltip": "Share of the session with a known current: not plugged in and, on phones without a coulomb counter, between the first and last battery level drops.",
         "load_error": "Could not open the report: {error}"
     }
 }

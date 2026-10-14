@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from core import history
-from tests.fixtures import HISTORY, T0
+from tests.fixtures import HISTORY, LEVEL_HISTORY, T0
 
 
 def spans(hist, metric):
@@ -62,6 +62,12 @@ class HistoryTest(unittest.TestCase):
         h = history.parse_history(f"9,h,0:RESET:TIME:{T0}\n9,h,0,Bcc=-2\n9,h,1000,Bcc=-3\n")
         self.assertTrue(h.has_coulomb)
         self.assertEqual(spans(h, "charge_mah"), [(0, 1000, -2), (1000, 1000, -3)])
+
+    def test_battery_capacity(self):
+        self.assertIsNone(self.h.capacity_mah)  # no power use summary
+        self.assertEqual(history.parse_history(LEVEL_HISTORY).capacity_mah, 3000)
+        h = history.parse_history(f"9,h,0:RESET:TIME:{T0}\n9,h,0,Bl=50\n9,0,l,pws,0,0,0,0\n")
+        self.assertIsNone(h.capacity_mah)
 
     def test_no_history(self):
         with self.assertRaises(history.HistoryError):

@@ -15,7 +15,13 @@ from core import PowDroidError, __version__, adb, debug, history, html_report, m
 
 logger = logging.getLogger("powdroid.session")
 
-MAX_UNCERTAINTY_PCT = 5  # i.e. at least 20 mAh consumed, given the 1 mAh counter resolution
+MAX_UNCERTAINTY_PCT = 5  # i.e. at least 20 mAh consumed with the coulomb counter, or a 20 % level drop
+
+# Shown before recording on phones whose battery does not report its coulomb counter.
+NO_COULOMB_NOTICE = ("This phone does not report its battery coulomb counter: PowDroid will estimate the "
+                     "energy from the battery level drops, which is much less precise. Record a long "
+                     "session: the battery level should drop by at least 10 % (for about ±10 %), "
+                     "or 20 % for ±5 %.")
 
 
 class NoDataError(PowDroidError):
@@ -79,19 +85,27 @@ def unplugged_span(hist, start_ms, stop_ms):
     return start_ms, stop_ms
 
 
-def charge_update_interval_s(hist, start_ms, stop_ms):
-    """Average time between the phone's battery charge readings, around the session."""
-    spans = [iv for iv in hist.intervals["charge_mah"] if iv.start < stop_ms and iv.end > start_ms]
+def charge_update_interval_s(readings, start_ms, stop_ms):
+    """Average time between the battery charge readings (metrics.ChargeSource), around the session."""
+    spans = [iv for iv in readings if iv.start < stop_ms and iv.end > start_ms]
     return sum(iv.end - iv.start for iv in spans) / len(spans) / 1000 if spans else None
 
 
-def check(hist, requested, measured, summary):
+def check(hist, requested, measured, summary, source):
     """Return the warnings about the reliability of the results.
 
-    requested is the (start, stop) asked for, measured its unplugged part.
+    requested is the (start, stop) asked for, measured its unplugged part, and source the
+    metrics.ChargeSource the current comes from.
     """
     (requested_start, requested_stop), (start_ms, stop_ms) = requested, measured
+    level = source.name == metrics.LEVEL
     warnings = []
+    if level:
+        warnings.append(f"This phone does not report its battery coulomb counter: current, power and energy "
+                        f"are estimated from the battery level drops, counting each 1 % as "
+                        f"{source.resolution_mah:g} mAh (of a {hist.capacity_mah:g} mAh design capacity). "
+                        "They are only known between the first and last level drops, and are overestimated "
+                        "if the battery has worn and holds less than its design capacity.")
     trimmed = []
     if start_ms - requested_start >= 1000:
         trimmed.append(f"the first {(start_ms - requested_start) / 1000:.0f} s")
@@ -113,15 +127,22 @@ def check(hist, requested, measured, summary):
         warnings.append(f"The phone was plugged in for {summary.plugged_s:.0f} s during the session: "
                         "no energy is reported for that time.")
     if summary.uncertainty_pct is None or summary.uncertainty_pct > MAX_UNCERTAINTY_PCT:
-        warnings.append(f"Only {summary.charge_mah:.1f} mAh were consumed: with the coulomb counter's "
-                        f"1 mAh resolution, energy and power are only known to about "
+        steps = 100 / MAX_UNCERTAINTY_PCT
+        if level:
+            consumed = (f"{summary.charge_mah:.0f} mAh ({summary.charge_mah / source.resolution_mah:.0f} % "
+                        "of the battery) were measured")
+            resolution, longer = "the battery level's 1 % resolution", f"a level drop of at least {steps:.0f} %"
+        else:
+            consumed = f"{summary.charge_mah:.1f} mAh were consumed"
+            resolution, longer = "the coulomb counter's 1 mAh resolution", f"at least {steps:.0f} mAh"
+        warnings.append(f"Only {consumed}: with {resolution}, energy and power are only known to about "
                         f"±{summary.uncertainty_pct or 100:.0f} %. Record a longer session "
-                        f"(at least {100 / MAX_UNCERTAINTY_PCT:.0f} mAh for ±{MAX_UNCERTAINTY_PCT} %).")
-    update_s = charge_update_interval_s(hist, start_ms, stop_ms)
+                        f"({longer} for ±{MAX_UNCERTAINTY_PCT} %).")
+    update_s = charge_update_interval_s(source.readings, start_ms, stop_ms)
     if update_s and update_s > (stop_ms - start_ms) / 3000:
-        warnings.append(f"The phone updated its battery charge reading only every {update_s:.0f} s on "
-                        "average: power values are averages over such periods and cannot show "
-                        "shorter variations.")
+        updated = "battery level dropped by 1 %" if level else "phone updated its battery charge reading"
+        warnings.append(f"The {updated} only every {update_s:.0f} s on average: power values are averages "
+                        "over such periods and cannot show shorter variations.")
     return warnings
 
 
@@ -133,24 +154,33 @@ def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_
     logger.info("Processing %s: session from %s to %s, dump taken at %s (device time)",
                 dump_path, debug.ms(start_ms), debug.ms(stop_ms), debug.ms(dump_ms))
     hist = history.parse_file(dump_path, end_ms=dump_ms)
-    if not hist.has_coulomb:
+    source = metrics.charge_source(hist)
+    if source is None:
         values = {iv.value for iv in hist.intervals["charge_mah"]}
         found = (f"its charge counter stays at {values.pop()} mAh" if values
                  else "its battery history has no charge counter")
-        raise NoDataError(f"This device does not report its battery coulomb counter ({found}), "
-                          "so its energy consumption cannot be measured. "
-                          f"The battery statistics are saved in {dump_path}.")
+        raise NoDataError(f"This device does not report its battery coulomb counter ({found}), nor its "
+                          "battery capacity to estimate the energy from the battery level, so its energy "
+                          f"consumption cannot be measured. The battery statistics are saved in {dump_path}.")
+    if source.name == metrics.LEVEL:
+        logger.info("No coulomb counter: the current is estimated from the battery level drops, "
+                    "1 %% = %g mAh", source.resolution_mah)
     measured = unplugged_span(hist, start_ms, stop_ms)
     if measured != (start_ms, stop_ms):
         logger.info("Left out while plugged in: measuring from %s to %s", *map(debug.ms, measured))
-    rows = metrics.compute_rows(hist, *measured)
-    summary = metrics.summarize(rows)
+    rows = metrics.compute_rows(hist, *measured, source)
+    summary = metrics.summarize(rows, source.name, source.resolution_mah)
     logger.info("%d rows; summary: %s", len(rows), asdict(summary))
     if not summary.measured_s:
+        if source.name == metrics.LEVEL:
+            raise NoDataError("This device does not report its battery coulomb counter, so PowDroid estimates "
+                              "the energy from the battery level drops, but the level did not drop twice while "
+                              "the phone was unplugged. Record a longer session: the battery level should drop "
+                              "by at least 10 %.")
         raise NoDataError("No battery data found for the recorded session. Make sure the phone "
                           "stays unplugged and the session lasts long enough for the battery charge to drop.")
 
-    result = Result(Path(csv_path), rows, summary, check(hist, (start_ms, stop_ms), measured, summary))
+    result = Result(Path(csv_path), rows, summary, check(hist, (start_ms, stop_ms), measured, summary, source))
     result.csv_path.parent.mkdir(parents=True, exist_ok=True)
     metrics.write_csv(rows, result.csv_path)
     session = {
@@ -163,7 +193,9 @@ def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_
         "stop_ms": measured[1],
         "dump_ms": dump_ms,
         "dump_file": str(dump_path),
-        "charge_update_interval_s": charge_update_interval_s(hist, *measured),
+        "current_source": source.name,
+        "battery_capacity_mah": hist.capacity_mah,
+        "charge_update_interval_s": charge_update_interval_s(source.readings, *measured),
         "summary": asdict(summary),
         "warnings": result.warnings,
     }
@@ -179,15 +211,22 @@ def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_
 
 
 def load(csv_path):
-    """Read a session back from its CSV, with the warnings of its JSON file when there is one."""
+    """Read a session back from its CSV, with the warnings of its JSON file when there is one.
+
+    The JSON file also tells where the current came from, which sets the uncertainty.
+    """
     logger.info("Loading %s", csv_path)
     rows = metrics.read_csv(csv_path)
     result = Result(Path(csv_path), rows, metrics.summarize(rows))
     try:
-        result.warnings = json.loads(result.json_path.read_text(encoding="utf-8"))["warnings"]
+        saved = json.loads(result.json_path.read_text(encoding="utf-8"))
+        result.warnings = saved["warnings"]
+        summary = saved.get("summary", {})
+        result.summary = metrics.summarize(rows, summary.get("current_source", metrics.COULOMB),
+                                           summary.get("resolution_mah", 1.0))
     except FileNotFoundError:
         pass  # a CSV without its session file: no warnings to show
-    except (OSError, ValueError, KeyError) as e:
+    except (OSError, ValueError, KeyError, AttributeError) as e:
         result.warnings = [f"The session file {result.json_path.name} could not be read ({e}): "
                            "its reliability warnings are not shown."]
     return result

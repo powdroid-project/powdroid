@@ -4,6 +4,10 @@ Each row covers an interval during which no tracked state changed. Rows tile the
 recorded session exactly, from its start to its stop. Unknown values are left empty;
 in particular the current (and so power and energy) is unknown while the phone is
 plugged in, because the coulomb counter then measures charging, not consumption.
+
+The current comes from the battery's coulomb counter. Phones without one only report
+the battery level: the current is then estimated from the level drops, 1 % of the
+battery capacity at a time, which is far less precise.
 """
 
 import csv
@@ -33,18 +37,56 @@ FLOAT_COLUMNS = {"elapsed_s", "current_ma", "power_w", "energy_j", "consumed_mah
 TEXT_COLUMNS = {"top_app", "wakelocks"}
 
 
-def _currents(history):
-    """Intervals of known current (mA), one per coulomb-counter reading.
+COULOMB, LEVEL = "coulomb_counter", "battery_level"  # where the current comes from
+
+
+@dataclass
+class ChargeSource:
+    """The battery charge readings the current is computed from."""
+
+    name: str  # COULOMB or LEVEL
+    readings: list  # [Interval] of the remaining charge, in mAh
+    resolution_mah: float  # charge step between readings: the uncertainty of a consumed charge
+
+
+def _level_readings(history):
+    """Charge readings estimated from the battery level, for phones without a coulomb counter.
+
+    When the level changes, the charge has just crossed a 1 % step of the capacity: it is
+    known at that moment, so each change starts a reading. The level held when the history
+    starts (or resumes after a gap) only covers part of a step and is left out.
+    """
+    runs = []  # the level intervals, with repeated readings of the same level merged
+    for iv in history.intervals["battery_level_pct"]:
+        if runs and runs[-1].end == iv.start and runs[-1].value == iv.value:
+            runs[-1] = Interval(runs[-1].start, iv.end, iv.value)
+        else:
+            runs.append(iv)
+    return [Interval(iv.start, iv.end, iv.value * history.capacity_mah / 100)
+            for previous, iv in zip(runs, runs[1:]) if previous.end == iv.start]
+
+
+def charge_source(history):
+    """The coulomb counter if the battery reports one, else the battery level (None: neither is usable)."""
+    if history.has_coulomb:
+        return ChargeSource(COULOMB, history.intervals["charge_mah"], 1)
+    if history.capacity_mah:
+        return ChargeSource(LEVEL, _level_readings(history), history.capacity_mah / 100)
+    return None
+
+
+def _currents(readings, plugged):
+    """Intervals of known current (mA), one per charge reading.
 
     The current of a reading is the charge drop until the next reading over the time in
-    between. It is unknown for the last reading and while the phone is plugged in.
+    between. It is unknown for the last reading, before a gap in the readings (e.g. a
+    reboot) and while the phone is plugged in.
     """
-    coulomb = history.intervals["charge_mah"]
-    plugged = history.intervals["plugged"]
     currents = []
-    for iv, following in zip(coulomb, coulomb[1:]):
+    for iv, following in zip(readings, readings[1:]):
         hours = (iv.end - iv.start) / 3_600_000
-        if hours > 0 and not any(p.start < iv.end and p.end > iv.start for p in plugged):
+        if (hours > 0 and following.start == iv.end
+                and not any(p.start < iv.end and p.end > iv.start for p in plugged)):
             currents.append(Interval(iv.start, iv.end, (iv.value - following.value) / hours))
     return currents
 
@@ -79,14 +121,16 @@ def _voltages(history, times):
     return voltages
 
 
-def compute_rows(history, start_ms, stop_ms):
+def compute_rows(history, start_ms, stop_ms, source=None):
     """Build the rows covering [start_ms, stop_ms] (device time).
 
     The row boundaries are the session start and stop plus every state change in
-    between, so each history interval covers a contiguous run of rows.
+    between, so each history interval covers a contiguous run of rows. The current comes
+    from source (by default, charge_source(history)).
     """
     if stop_ms <= start_ms:
         return []
+    source = source or charge_source(history)
     times = sorted({start_ms, stop_ms} | {
         t for intervals in history.intervals.values() for iv in intervals for t in (iv.start, iv.end)
         if start_ms < t < stop_ms})
@@ -110,7 +154,9 @@ def compute_rows(history, start_ms, stop_ms):
     # Wakelocks can overlap and are all kept (below); other states keep one value per row.
     states = {metric: column(intervals) for metric, intervals in history.intervals.items()
               if metric != "wakelock"}
-    states["current_ma"] = column(_currents(history))
+    states["current_ma"] = column(_currents(source.readings, history.intervals["plugged"]) if source else [])
+    if not (source and source.name == COULOMB):
+        states["charge_mah"] = [None] * count  # no coulomb counter (its readings are 0)
     states["voltage_mv"] = _voltages(history, [(a + b) / 2 for a, b in zip(times, times[1:])])
     wakelocks = [set() for _ in range(count)]
     for first, end, name in row_ranges(history.intervals["wakelock"]):
@@ -211,13 +257,16 @@ class Summary:
     voltage_max_mv: int = None
     level_start_pct: int = None
     level_end_pct: int = None
-    # The coulomb counter has a 1 mAh resolution: relative uncertainty of charge, energy and power.
+    # Relative uncertainty of charge, energy and power: the resolution of the charge readings
+    # over the consumed charge.
     uncertainty_pct: float = None
+    current_source: str = COULOMB
+    resolution_mah: float = 1.0  # 1 mAh for the coulomb counter, 1 % of the capacity for the level
 
 
-def summarize(rows):
+def summarize(rows, current_source=COULOMB, resolution_mah=1.0):
     if not rows:
-        return Summary()
+        return Summary(current_source=current_source, resolution_mah=resolution_mah)
     measured = [r for r in rows if r["power_w"] is not None]
     measured_s = sum(r["duration_ms"] for r in measured) / 1000
     energy = sum(r["energy_j"] for r in measured)
@@ -236,7 +285,9 @@ def summarize(rows):
         voltage_max_mv=max(volts, default=None),
         level_start_pct=levels[0] if levels else None,
         level_end_pct=levels[-1] if levels else None,
-        uncertainty_pct=100 / charge if charge > 0 else None,
+        uncertainty_pct=100 * resolution_mah / charge if charge > 0 else None,
+        current_source=current_source,
+        resolution_mah=resolution_mah,
     )
 
 

@@ -49,6 +49,7 @@ class RecordPage(QWidget):
         self.state = None
         self.device = None
         self.output_dir = None
+        self.coulomb = True
         self.start_time = None
         self.stop_time = None
         self.elapsed = QElapsedTimer()
@@ -77,9 +78,10 @@ class RecordPage(QWidget):
         self.timer_label = label(role="timer", align=CENTER)
         self.hint = label(role="muted", wrap=True, align=CENTER)
         self.warning = label(t("record.replugged_warning"), "warning", wrap=True, align=CENTER)
+        self.no_coulomb = label(t("record.no_coulomb"), "warning", wrap=True, align=CENTER)
         self.error = label(role="error", wrap=True, align=CENTER)
         self.error.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        for w in (self.title, self.timer_label, self.hint, self.warning, self.error):
+        for w in (self.title, self.timer_label, self.hint, self.warning, self.no_coulomb, self.error):
             layout.addWidget(w)
         layout.addStretch()
 
@@ -96,10 +98,14 @@ class RecordPage(QWidget):
 
     # -- public API -------------------------------------------------------
 
-    def begin(self, device, output_dir):
-        """Called once the device has been prepared (stats reset)."""
+    def begin(self, device, output_dir, coulomb=True):
+        """Called once the device has been prepared (stats reset).
+
+        coulomb=False warns that the battery has no coulomb counter, so the session must be long.
+        """
         self.device = device
         self.output_dir = output_dir
+        self.coulomb = coulomb
         self.start_time = self.stop_time = None
         self._set_state(State.WAIT_UNPLUG)
 
@@ -154,6 +160,7 @@ class RecordPage(QWidget):
             self.tick.stop()
         self.timer_label.setVisible(recording or state == State.WAIT_REPLUG)
         self.warning.setVisible(False)
+        self.no_coulomb.setVisible(not self.coulomb and state in (State.WAIT_UNPLUG, State.RECORDING))
         self.error.setVisible(state == State.ERROR)
         self.stop_button.setVisible(recording)
         self.retry_button.setVisible(state == State.ERROR)

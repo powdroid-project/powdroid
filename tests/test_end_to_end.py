@@ -47,7 +47,7 @@ class EndToEndTest(unittest.TestCase):
     def record_session(self):
         device = adb.find_device()
         self.assertEqual((device.serial, device.model, device.android_version), ("FAKE123", "Pixel 8 (fake)", "15"))
-        adb.prepare(device.serial)
+        self.coulomb = adb.prepare(device.serial)
         self.set_state(None)
         start = datetime.now()
         time.sleep(SESSION_S)
@@ -63,6 +63,8 @@ class EndToEndTest(unittest.TestCase):
         self.assertTrue(result.html_path.exists())
         self.assertEqual(len(list((self.dir / "out" / "dump").glob("batterystats_*.txt"))), 1)
 
+        self.assertIs(self.coulomb, True)
+        self.assertEqual(data["current_source"], "coulomb_counter")
         rows = metrics.read_csv(result.csv_path)
         self.assertEqual(len(rows), len(result.rows))
         self.assertAlmostEqual(sum(r["duration_ms"] for r in rows) / 1000, SESSION_S, delta=0.1)
@@ -71,6 +73,16 @@ class EndToEndTest(unittest.TestCase):
         self.assertTrue(known)
         for current in known:  # 1 mAh every 2 steps of 100 ms
             self.assertAlmostEqual(current, 18000, delta=1)
+
+    def test_collect_without_coulomb_counter(self):
+        with mock.patch.dict(os.environ, FAKE_ADB_NO_COULOMB="1"):
+            result = self.record_session()
+        self.assertIs(self.coulomb, False)  # known before recording
+        self.assertEqual(json.loads(result.json_path.read_text())["current_source"], "battery_level")
+        known = [r["current_ma"] for r in result.rows if r["current_ma"] is not None]
+        self.assertTrue(known)
+        for current in known:  # 1 % of 3000 mAh every 3 steps of 100 ms
+            self.assertAlmostEqual(current, 360000, delta=1)
 
     def test_debug_log(self):
         path = debug.enable(self.dir / "debug.log")

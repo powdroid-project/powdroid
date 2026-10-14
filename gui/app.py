@@ -159,9 +159,10 @@ class MainWindow(QMainWindow):
         self.home.set_busy(True)
         logger.info("Preparing %s", device.serial)
 
-        def prepared(_):
+        def prepared(coulomb):
             self.home.set_busy(False)
-            self.record.begin(device, self.settings["output_dir"])
+            # None (unknown) is treated as a counter: the results will tell.
+            self.record.begin(device, self.settings["output_dir"], coulomb is not False)
             self.stack.setCurrentWidget(self.record)
             # The device may already be unplugged by the time preparation finished.
             self.record.on_device_changed(self.home.device)

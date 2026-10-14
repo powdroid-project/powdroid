@@ -89,7 +89,8 @@ def _record(output_formats, out_dir, serial, verbose):
         device = adb.find_device(serial)
     serial = device.serial
     log(f"Using {device.label} (Android {device.android_version or '?'}, {serial}).")
-    adb.prepare(serial)
+    if adb.prepare(serial) is False:
+        log(f"WARNING | {session.NO_COULOMB_NOTICE}", logging.WARNING)
 
     log("Step 2/4 | Recording")
     log("Unplug your device, then follow the instructions.")

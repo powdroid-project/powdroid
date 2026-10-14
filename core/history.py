@@ -29,6 +29,7 @@ logger = logging.getLogger("powdroid.history")
 
 H = "9,h,"
 HSP = "9,hsp,"
+PWS = "9,0,l,pws,"  # power use summary: battery capacity, then computed and drained charge (mAh)
 
 INT_METRICS = {
     "Bv": "voltage_mv",
@@ -76,6 +77,7 @@ class History:
     start_ms: int = None  # time of the statistics reset (or of the first record)
     end_ms: int = None  # time up to which the states are known
     overflow_ms: int = None  # set when the history buffer overflowed: no data after it
+    capacity_mah: float = None  # battery design capacity (from the power profile), if reported
 
     @property
     def has_coulomb(self):
@@ -213,13 +215,22 @@ class _Builder:
                 active.setdefault(value, (now if tr else origin, name))
 
 
+def _capacity(fields):
+    """The battery capacity (mAh) at the start of a power use summary, or None if not reported."""
+    try:
+        capacity = float(fields.split(",", 1)[0])
+    except ValueError:
+        return None
+    return capacity if capacity > 0 else None
+
+
 def parse_lines(lines, end_ms=None):
     """Parse dumpsys lines into a History whose intervals are sorted by start time.
 
     end_ms is the device time of the dump: states hold until then, not just until the
     last history record (a quiet phone can log nothing for minutes).
     """
-    pool, records = {}, []
+    pool, records, capacity = {}, [], None
     for line in lines:
         line = line.strip()
         if line.startswith(HSP):
@@ -230,6 +241,8 @@ def parse_lines(lines, end_ms=None):
             record = _parse_record(line[len(H):])
             if record:
                 records.append(record)
+        elif line.startswith(PWS):
+            capacity = _capacity(line[len(PWS):])
     if not records:
         raise HistoryError("No battery history in the dumpsys output")
 
@@ -244,6 +257,7 @@ def parse_lines(lines, end_ms=None):
 
     history = builder.history
     history.end_ms = builder.now
+    history.capacity_mah = capacity
     for intervals in history.intervals.values():
         intervals.sort(key=lambda iv: (iv.start, iv.end))
     if logger.isEnabledFor(logging.DEBUG):
@@ -273,14 +287,15 @@ def _log_summary(records, pool, history):
         "  from %s to %s%s\n"
         "  state changes by key: %s\n"
         "  intervals by metric: %s\n"
-        "  charge counter: %s",
+        "  charge counter: %s; battery capacity: %s",
         len(records), ", ".join(f"{tag} {n}" for tag, n in tags.items()) or "no TIME or RESET",
         sum(record.time is None for record in records), len(pool),
         debug.ms(history.start_ms), debug.ms(history.end_ms),
         f", buffer overflow at {debug.ms(history.overflow_ms)}" if history.overflow_ms is not None else "",
         ", ".join(f"{key} {n}" for key, n in keys.most_common()) or "none",
         ", ".join(f"{metric} {len(ivs)}" for metric, ivs in history.intervals.items() if ivs) or "none",
-        f"{len(charges)} distinct values from {charges[0]} to {charges[-1]} mAh" if charges else "no readings")
+        f"{len(charges)} distinct values from {charges[0]} to {charges[-1]} mAh" if charges else "no readings",
+        f"{history.capacity_mah:g} mAh" if history.capacity_mah else "not reported")
 
 
 def _log_file(path, examples=5):

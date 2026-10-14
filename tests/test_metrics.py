@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from core import history, html_report, metrics, session
-from tests.fixtures import HISTORY, T0
+from tests.fixtures import HISTORY, LEVEL_HISTORY, T0
 
 V3_COLUMNS = [
     "start_ms", "end_ms", "elapsed_s", "duration_ms",
@@ -91,6 +91,31 @@ class MetricsTest(unittest.TestCase):
         self.assertAlmostEqual(s.energy_j, sum(r["energy_j"] or 0 for r in self.rows))
         self.assertAlmostEqual(s.mean_power_w, s.energy_j / s.measured_s)
         self.assertAlmostEqual(s.mean_current_ma, s.charge_mah / (s.measured_s / 3600))
+
+    def test_current_from_the_battery_level_without_coulomb_counter(self):
+        hist = history.parse_history(LEVEL_HISTORY)
+        source = metrics.charge_source(hist)
+        self.assertEqual((source.name, source.resolution_mah), (metrics.LEVEL, 30))
+        # The level held since the reset is a partial step; 83 % re-logged at 70 s is the same reading.
+        self.assertEqual([(iv.start - T0, iv.end - T0, iv.value) for iv in source.readings],
+                         [(30000, 90000, 2490), (90000, 120000, 2460), (120000, 150000, 2430)])
+        rows = metrics.compute_rows(hist, T0 + 10000, T0 + 150000)
+        self.assertEqual(rel(rows), [(10000, 30000), (30000, 70000), (70000, 90000), (90000, 120000),
+                                     (120000, 150000)])
+        self.assertEqual([r["current_ma"] for r in rows], [None, 1800, 1800, 3600, None])
+        self.assertTrue(all(r["charge_mah"] is None for r in rows))  # no coulomb counter
+        self.assertEqual(rows[0]["battery_level_pct"], 84)
+        s = metrics.summarize(rows, source.name, source.resolution_mah)
+        self.assertAlmostEqual(s.charge_mah, 60)
+        self.assertEqual((s.measured_s, s.uncertainty_pct, s.current_source), (90, 50, metrics.LEVEL))
+
+    def test_no_current_across_a_gap_in_the_readings(self):
+        # A reboot from 20 s to 30 s: the 99 mAh reading has no following one.
+        text = (f"9,h,0:RESET:TIME:{T0}\n9,h,0,Bcc=100\n9,h,10000,Bcc=99\n9,h,10000,+S\n"
+                f"9,h,5000:START\n9,h,0:TIME:{T0 + 30000}\n9,h,0,Bcc=90\n9,h,10000,Bcc=89\n9,h,10000,Bcc=88\n")
+        rows = metrics.compute_rows(history.parse_history(text), T0, T0 + 50000)
+        currents = {r["start_ms"] - T0: r["current_ma"] for r in rows}
+        self.assertEqual(currents, {0: 360, 10000: None, 20000: None, 30000: 360, 40000: 360})
 
     def test_csv_roundtrip(self):
         with tempfile.TemporaryDirectory() as d:
