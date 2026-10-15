@@ -4,8 +4,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core import metrics, session
-from tests.fixtures import HISTORY, LEVEL_HISTORY, OUT_OF_ORDER_HISTORY, T0
+from powdroid.core import metrics, session
+from tests.fixtures import (
+    FROZEN_COUNTER_HISTORY, HISTORY, LEVEL_COUNTER_HISTORY, LEVEL_HISTORY, OUT_OF_ORDER_HISTORY, T0,
+)
 
 
 class SessionTest(unittest.TestCase):
@@ -88,14 +90,29 @@ class SessionTest(unittest.TestCase):
         self.assertAlmostEqual(result.summary.charge_mah, 60)
         self.assertEqual((result.summary.measured_s, result.summary.uncertainty_pct), (90, 50))
         text = " ".join(result.warnings)
-        self.assertIn("estimated from the battery level drops, counting each 1 % as 30 mAh "
-                      "(of a 3000 mAh design capacity)", text)
+        self.assertIn("This phone does not report its battery coulomb counter: current, power and energy are "
+                      "estimated from the battery level drops, counting each 1 % as 30 mAh, 1 % of the battery "
+                      "capacity reported by Android (3000 mAh). They are only known between the first and last "
+                      "level drops, and are overestimated if the battery has worn", text)
         self.assertIn("Only 60 mAh (2 % of the battery) were measured: with the battery level's 1 % "
                       "resolution, energy and power are only known to about ±50 %", text)
         self.assertIn("a level drop of at least 20 % for ±5 %", text)
         self.assertNotIn("coulomb counter's 1 mAh", text)
         data = json.loads(result.json_path.read_text())
-        self.assertEqual((data["current_source"], data["battery_capacity_mah"]), ("battery_level", 3000))
+        self.assertEqual((data["current_source"], data["battery_capacity_mah"], data["battery_capacity_source"]),
+                         ("battery_level", 3000, "reported"))
+
+    def test_learned_capacity_is_preferred(self):
+        # bt: ..., estimated capacity 2900 mAh, learned capacities 2700000 to 2850000 µAh, ...
+        text = LEVEL_HISTORY + "9,0,l,bt,0,1,2,3,4,5,6,7,2900,2700000,2850000,0\n"
+        result = self.run_process(text, 0, 150000)
+        self.assertAlmostEqual(result.summary.charge_mah, 57)  # two 1 % drops of 2850 mAh
+        self.assertIn("1 % of the battery capacity learned by the fuel gauge (2850 mAh). They are only known "
+                      "between the first and last level drops.", " ".join(result.warnings))
+        for bt, expected in (("2900,-1,-1", (2900, "estimated")), ("-1,-1,-1", (3000, "reported"))):
+            text = LEVEL_HISTORY + f"9,0,l,bt,0,1,2,3,4,5,6,7,{bt},0\n"
+            data = json.loads(self.run_process(text, 0, 150000).json_path.read_text())
+            self.assertEqual((data["battery_capacity_mah"], data["battery_capacity_source"]), expected)
         self.assertEqual(data["charge_update_interval_s"], 40)  # level steps of 60, 30 and 30 s
         loaded = session.load(result.csv_path)  # the uncertainty needs the source, saved in the JSON
         self.assertEqual((loaded.summary.current_source, loaded.summary.uncertainty_pct), ("battery_level", 50))
@@ -133,3 +150,48 @@ class SessionTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CounterTest(unittest.TestCase):
+    def run_process(self, text, start, stop):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        dump = Path(d.name) / "dump.txt"
+        dump.write_text(text)
+        return session.process(dump, T0 + start, T0 + stop, Path(d.name) / "PowDroid_x.csv")
+
+    def test_counter_following_the_level(self):
+        result = self.run_process(LEVEL_COUNTER_HISTORY, 0, 160_000)
+        data = json.loads(result.json_path.read_text())
+        self.assertEqual(data["current_source"], "coulomb_counter")
+        self.assertEqual((data["charge_resolution_mah"], data["counter_follows_level"]), (44.0, True))
+        self.assertTrue(any("only changes when the battery level does, by about 44 mAh" in w
+                            for w in result.warnings))
+        # 3 steps of 44-45 mAh: about ±33 %, so a longer session is asked for.
+        self.assertTrue(any("±33 %" in w and "coulomb counter's 44 mAh resolution" in w for w in result.warnings))
+
+    def test_frozen_counter_falls_back_to_the_level(self):
+        result = self.run_process(FROZEN_COUNTER_HISTORY, 0, 150_000)
+        self.assertEqual(result.summary.current_source, "battery_level")
+        self.assertIn("The battery's charge counter did not change while the phone was unplugged (it stayed at "
+                      "2500 mAh): the energy is estimated from the battery level drops instead.", result.warnings)
+        self.assertAlmostEqual(result.summary.charge_mah, 60, places=6)  # two 1 % drops of 3000 mAh
+
+
+class MarkerTest(unittest.TestCase):
+    def test_markers_and_renaming(self):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        dump = Path(d.name) / "dump.txt"
+        dump.write_text(HISTORY)
+        markers = [{"time_ms": T0 + 60000, "label": "Video"}, {"time_ms": T0 + 20000, "label": "Scroll"}]
+        result = session.process(dump, T0, T0 + 70000, Path(d.name) / "PowDroid_x.csv", html=True, markers=markers)
+        self.assertEqual([(p["label"], p["marker"]) for p in result.phases],
+                         [("Start", None), ("Scroll", 1), ("Video", 0)])
+        session.rename_marker(result, 1, "Scrolling")
+        saved = json.loads(result.json_path.read_text())
+        self.assertEqual([m["label"] for m in saved["markers"]], ["Video", "Scrolling"])
+        self.assertEqual([p["label"] for p in saved["phases"]], ["Start", "Scrolling", "Video"])
+        self.assertIn("Scrolling", result.html_path.read_text())
+        loaded = session.load(result.csv_path)
+        self.assertEqual([p["label"] for p in loaded.phases], ["Start", "Scrolling", "Video"])

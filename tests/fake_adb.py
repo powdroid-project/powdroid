@@ -21,6 +21,18 @@ charging while plugged in), a coulomb counter counting in steps of 50 µAh, and 
 rails unless $FAKE_ADB_NO_RAILS is set. With $FAKE_ADB_OLD_PERFETTO, perfetto rejects
 BATTERY_COUNTER_VOLTAGE, as versions before 2024 do. With $FAKE_ADB_NO_PULL, `adb pull`
 fails (the trace is then copied with `exec-out cat`).
+
+Other devices: $FAKE_ADB_OTHERS lists devices shown before FAKE123 by `adb devices`, e.g.
+"emulator-5554:device,0123:no permissions"; commands sent to them are answered as FAKE123's.
+The batterystats options turned on (`--enable`) and not off again are in the `options` file.
+With $FAKE_ADB_NO_KILL_ALL, `am kill-all` fails as on phones forbidding it.
+`dumpsys batterystats -c --history` prints the history alone (counted in `history_dumps`),
+or nothing usable with $FAKE_ADB_NO_HISTORY_OPTION.
+
+Wi-Fi: with $FAKE_ADB_WIRELESS, the device is 192.168.1.20:5555 and stays connected when
+unplugged: the `power` file ("1" or "0", plugged in by default) says whether it is charging,
+as `dumpsys battery` shows. `adb connect`, `adb pair`, `adb tcpip` and the Wi-Fi address are
+answered too ($FAKE_ADB_CONNECT_FAIL: connecting fails).
 """
 
 import os
@@ -32,6 +44,8 @@ import time
 from perfetto_trace import simulate
 
 DIR = os.environ.get("FAKE_ADB_DIR", "/tmp/fake_adb")
+WIRELESS = bool(os.environ.get("FAKE_ADB_WIRELESS"))
+SERIAL = "192.168.1.20:5555" if WIRELESS else "FAKE123"
 SKEW_MS = int(os.environ.get("FAKE_ADB_SKEW_MS", "30000"))
 STEP_MS = int(os.environ.get("FAKE_ADB_STEP_MS", "1000"))  # time between history records
 NO_COULOMB = bool(os.environ.get("FAKE_ADB_NO_COULOMB"))
@@ -156,6 +170,40 @@ def perfetto(command, now_ms, plugs):
     return 0
 
 
+def plugged_in(state):
+    """Whether the phone is charging: plugged into the computer, or over Wi-Fi as the power file says."""
+    return read("power", "1") == "1" if WIRELESS else state == "device"
+
+
+def log_plug(state, now_ms):
+    """Log a plug transition, for the battery history (seen when adb looks at the phone)."""
+    plugged = plugged_in(state)
+    log = read("plugs").split()
+    if plugged != (log[-1].endswith(":1") if log else True):
+        write("plugs", f"{now_ms}:{int(plugged)}\n", "a")
+
+
+def devices(state, now_ms):
+    """The device lines of `adb devices`; logs the plug transitions it sees."""
+    log_plug(state, now_ms)
+    lines = [f"{serial}\t{other_state}\n" for serial, other_state in
+             (other.split(":", 1) for other in filter(None, os.environ.get("FAKE_ADB_OTHERS", "").split(",")))]
+    return "".join(lines) + (f"{SERIAL}\t{state}\n" if state else "")
+
+
+def track_devices(lifetime_s=300):
+    """`adb track-devices`: the device lines (length in 4 hex digits first) at every change, until killed."""
+    last, deadline = None, time.time() + lifetime_s
+    while time.time() < deadline:
+        text = devices(read("state"), int(time.time() * 1000) + SKEW_MS)
+        if text != last:
+            last = text
+            sys.stdout.buffer.write(f"{len(text.encode()):04x}{text}".encode())  # binary: no CR LF on Windows
+            sys.stdout.buffer.flush()
+        time.sleep(0.05)
+    return 0
+
+
 def main(args):
     os.makedirs(DIR, exist_ok=True)
     if args[:1] == ["-s"]:
@@ -168,13 +216,26 @@ def main(args):
         print("Android Debug Bridge version 1.0.41 (fake)")
         return 0
     if args[0] == "devices":
-        plugged = state == "device"
-        log = read("plugs").split()
-        if plugged != (log[-1].endswith(":1") if log else True):
-            write("plugs", f"{now_ms}:{int(plugged)}\n", "a")
         print("List of devices attached")
-        if state:
-            print(f"FAKE123\t{state}")
+        sys.stdout.write(devices(state, now_ms))
+        return 0
+    if args[0] == "track-devices":
+        if os.environ.get("FAKE_ADB_NO_TRACK"):  # as an adb too old to know it
+            print("adb: unknown command track-devices", file=sys.stderr)
+            return 1
+        return track_devices()
+    if args[0] == "connect":
+        if os.environ.get("FAKE_ADB_CONNECT_FAIL"):
+            print(f"failed to connect to '{args[1]}': Connection refused")
+        else:
+            print(f"connected to {args[1]}")
+        return 0
+    if args[0] == "pair":
+        print(f"Successfully paired to {args[1]} [guid=adb-FAKE123-abcdef]" if args[2] == "123456"
+              else "Failed: Wrong password or connection was dropped.")
+        return 0
+    if args[0] == "tcpip":
+        print(f"restarting in TCP mode port: {args[1]}")
         return 0
     if args[0] not in ("shell", "exec-out", "pull"):
         print(f"fake adb: unsupported command: {command}", file=sys.stderr)
@@ -193,13 +254,34 @@ def main(args):
     elif "--reset" in command:
         write("reset", str(now_ms))
         write("plugs", "")
+    elif args[1:4] in (["dumpsys", "batterystats", "--enable"], ["dumpsys", "batterystats", "--disable"]):
+        options = set(read("options").split())
+        options = options | {args[4]} if args[3] == "--enable" else options - {args[4]}
+        write("options", " ".join(sorted(options)))
+    elif args[1:] == ["am", "kill-all"] and os.environ.get("FAKE_ADB_NO_KILL_ALL"):
+        print("java.lang.SecurityException: Permission denial: killAllBackgroundProcesses()", file=sys.stderr)
+        return 255
     elif args[1] == "date":
         seconds_only = os.environ.get("FAKE_ADB_SECONDS_ONLY") or args[2] == "+%s"
         print(now_ms // 1000 if seconds_only else now_ms * 1_000_000)
     elif args[1:] == ["dumpsys", "battery"]:
-        print(f"Current Battery Service state:\n  level: 90\n  Charge counter: {0 if NO_COULOMB else 3000000}")
+        log_plug(state, now_ms)
+        usb = "true" if plugged_in(state) else "false"
+        print(f"Current Battery Service state:\n  AC powered: false\n  USB powered: {usb}\n  Wireless powered: false\n"
+              f"  level: 90\n  Charge counter: {0 if NO_COULOMB else 3000000}")
+    elif args[1:] == ["ip -f inet addr show wlan0"]:
+        print("27: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500\n"
+              "    inet 192.168.1.20/24 brd 192.168.1.255 scope global wlan0")
     elif args[1:] == ["dumpsys", "batterystats", "-c"]:
         sys.stdout.write(history(int(read("reset", now_ms)), now_ms, plugs))
+    elif args[1:] == ["dumpsys", "batterystats", "-c", "--history"]:
+        write("history_dumps", "1\n", "a")
+        if os.environ.get("FAKE_ADB_NO_HISTORY_OPTION"):  # as a phone that does not know --history
+            print("Unknown option: --history")
+        else:  # without the statistics sections (9,0,...) but the version
+            text = history(int(read("reset", now_ms)), now_ms, plugs)
+            sys.stdout.write("".join(line for line in text.splitlines(True)
+                                     if not line.startswith("9,0,") or ",vers," in line))
     return 0
 
 

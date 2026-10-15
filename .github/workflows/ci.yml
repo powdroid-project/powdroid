@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: pip install ruff
+      - run: ruff check .
+      - run: python -m compileall -q powdroid tests powdroid.py
+
+  test:
+    # The CLI and the measurement pipeline, against tests/fake_adb.py (no phone, no GUI packages).
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.11", "3.14"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e .
+      - run: python -m unittest discover tests -v
+
+  gui:
+    # The GUI driven end to end, without a display.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+      - run: pip install -e ".[gui]"
+      - run: python -m unittest discover tests -p "test_gui.py" -v
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: pip install build
+      - run: python -m build
+      - name: Install the wheel in a fresh environment
+        run: |
+          python -m venv /tmp/wheel-test
+          /tmp/wheel-test/bin/pip install dist/*.whl
+          cd /tmp
+          /tmp/wheel-test/bin/powdroid --version
+          /tmp/wheel-test/bin/python -c "from importlib.resources import files; \
+            assert files('powdroid.gui').joinpath('languages/en.json').is_file(); \
+            assert files('powdroid.gui').joinpath('ressources/fonts/Inter.ttf').is_file()"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/

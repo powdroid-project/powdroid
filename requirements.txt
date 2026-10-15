@@ -1,2 +1,3 @@
-PyQt6
-matplotlib
+# For the graphical interface (the command-line interface needs no package): pip install -r requirements.txt
+PyQt6>=6.11
+matplotlib>=3.11

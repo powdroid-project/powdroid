@@ -6,8 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core import history, metrics, perfetto, session
-from core.history import Interval
+from powdroid.core import history, metrics, perfetto, session
+from powdroid.core.history import Interval
 from tests import perfetto_trace as pt
 from tests.fixtures import HISTORY, T0
 
@@ -234,16 +234,17 @@ class SessionTest(unittest.TestCase):
         self.assertEqual((s.current_source, data["current_source"]), ("perfetto", "perfetto"))
         self.assertEqual(result.warnings[0], "A note.")
         self.assertFalse([w for w in result.warnings if "±" in w or "only every" in w])
-        # Unplugged for 60 s, minus the first poll interval after unplugging (polls at each plug change).
-        self.assertEqual(s.measured_s, 59.5)
-        self.assertAlmostEqual(s.charge_mah, 300 * 59.5 / 3600, delta=0.002)
+        # Unplugged for 60 s, minus the first poll interval after unplugging (polls at each plug change)
+        # and the first one after the history starts: before it, the plug state is unknown.
+        self.assertEqual(s.measured_s, 59.0)
+        self.assertAlmostEqual(s.charge_mah, 300 * 59.0 / 3600, delta=0.002)
         self.assertEqual(result.rows[0]["voltage_mv"], 3997)
         self.assertEqual(result.rows[0]["charge_mah"], 2999.583)  # µAh: 5 s at 300 mA after 3000 mAh
         plugged = [r for r in result.rows if r["plugged"]]
         self.assertTrue(plugged and all(r["current_ma"] is None for r in plugged))
         self.assertTrue(all(r["rail_S4M_VDD_CPUCL0_j"] is not None for r in plugged))  # valid while plugged in
 
-        self.assertEqual(data["trace_file"], str(result.csv_path.parent / "trace.pftrace"))
+        self.assertEqual(data["trace_file"], "trace.pftrace")  # relative to the JSON file
         self.assertEqual(data["perfetto"]["counters"], ["charge_uah", "current_ua", "voltage_uv", "level_pct"])
         self.assertEqual(data["perfetto"]["median_poll_interval_ms"], 500)
         rail = data["power_rails"][0]

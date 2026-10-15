@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "powdroid"
+dynamic = ["version"]
+description = "Off-device energy profiler for Android applications"
+readme = "README.md"
+license = "GPL-3.0-only"
+license-files = ["LICENSE.md"]
+requires-python = ">=3.11"
+authors = [{ name = "Olivier Le Goaër" }, { name = "Adel Noureddine" }]
+keywords = ["android", "energy", "battery", "profiler", "perfetto", "green software"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Monitoring",
+]
+# The command-line interface only needs the standard library (and adb).
+dependencies = []
+
+[project.optional-dependencies]
+gui = ["PyQt6>=6.11", "matplotlib>=3.11"]
+dev = ["ruff", "build", "pyinstaller"]
+
+[project.urls]
+Homepage = "https://github.com/powdroid-project/powdroid"
+Issues = "https://github.com/powdroid-project/powdroid/issues"
+
+[project.scripts]
+powdroid = "powdroid.__main__:main"
+
+[project.gui-scripts]
+powdroid-gui = "powdroid.__main__:gui_main"
+
+[tool.setuptools.dynamic]
+version = { attr = "powdroid.core.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["powdroid*"]
+
+[tool.setuptools.package-data]
+"powdroid.gui" = ["ressources/*.*", "ressources/fonts/*.ttf", "languages/*.json"]
+"powdroid.core" = ["vendor/*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]

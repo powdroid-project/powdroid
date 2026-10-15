@@ -79,3 +79,21 @@ OUT_OF_ORDER_HISTORY = f"""\
 #   95000  1175 mAh => 1380 mA over [95,155s)
 #  155000  1157 mAh
 #  165000  plugged back in
+
+# A fuel gauge computing its "coulomb counter" from the battery level: the counter only
+# changes with the level, by about 1 % of a 4410 mAh capacity (44 or 45 mAh, rounded).
+LEVEL_COUNTER_HISTORY = f"""\
+9,0,i,vers,36,215,AP2A,AP2A
+9,h,0:RESET:TIME:{T0}
+9,h,0,Bl=80,Bv=4000,Bcc=3528,+BP
+9,h,10000,-BP
+9,h,30000,Bl=79,Bcc=3484
+9,h,30000,Bl=78,Bcc=3440
+9,h,30000,Bl=77,Bcc=3395
+9,h,30000,Bl=76,Bcc=3351
+9,h,30000,+BP
+9,0,l,pws,4410,0,0,0
+"""
+
+# A counter stuck at a non-zero value while the level drops: the level is used instead.
+FROZEN_COUNTER_HISTORY = LEVEL_HISTORY.replace("Bcc=0", "Bcc=2500")

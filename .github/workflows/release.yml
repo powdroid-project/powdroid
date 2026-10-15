@@ -1,0 +1,81 @@
+name: Release
+
+# Pushing a tag such as v3.0.0a1 builds the Python package and the applications, and
+# attaches them to a draft GitHub release, to review and publish by hand.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: pip install build
+      - run: python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-package
+          path: dist/*
+
+  app:
+    # The graphical interface as an application (PyInstaller); adb is not included.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            archive: PowDroid-windows.zip
+          - os: macos-latest
+            archive: PowDroid-macos.zip
+          - os: ubuntu-latest
+            archive: PowDroid-linux.tar.gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: pip install ".[gui]" pyinstaller
+      - run: pyinstaller --noconfirm packaging/powdroid.spec
+      - name: Archive (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path dist/PowDroid -DestinationPath ${{ matrix.archive }}
+      - name: Archive (macOS)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent dist/PowDroid.app ${{ matrix.archive }}
+      - name: Archive (Linux)
+        if: runner.os == 'Linux'
+        run: tar -czf ${{ matrix.archive }} -C dist PowDroid
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ runner.os }}
+          path: ${{ matrix.archive }}
+
+  release:
+    needs: [package, app]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Versions such as 3.0.0a1, 3.0.0b2 or 3.0.0rc1 are pre-releases.
+          prerelease=""
+          if [[ "$TAG" =~ (a|b|rc)[0-9]+$ ]]; then prerelease="--prerelease"; fi
+          gh release create "$TAG" artifacts/* --draft $prerelease --title "PowDroid ${TAG#v}" \
+            --notes "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/$TAG/CHANGELOG.md). adb is not included: install the Android SDK platform tools. The macOS application is not signed: right-click it and choose Open the first time."

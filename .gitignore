@@ -3,3 +3,7 @@ dump
 logs
 .vscode
 .DS_Store
+build/
+dist/
+*.egg-info/
+PowDroid_*

@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core import history
+from powdroid.core import history
 from tests.fixtures import HISTORY, LEVEL_HISTORY, OUT_OF_ORDER_HISTORY, T0
 
 
@@ -86,6 +86,19 @@ class HistoryTest(unittest.TestCase):
         self.assertIn("1 out of order (up to 20 ms early)", text)
         self.assertIn("h (unreadable) 1", text)
         self.assertIn("| 9,h,oops", text)
+
+    def test_tags_written_in_full(self):
+        # Android 15+: a tag that does not fit in the string pool is written as uid:"name".
+        h = history.parse_history(f"""\
+9,h,0:RESET:TIME:{T0}
+9,h,0,+Etp=10100:"com.example.app",+Ewl=1000:"*alarm*"
+9,h,1000,-Ewl=1000:"*alarm*"
+9,h,1000,-Etp=10100:"com.example.app"
+""")
+        self.assertEqual([(iv.start - T0, iv.end - T0, iv.value) for iv in h.intervals["top_app"]],
+                         [(0, 2000, "com.example.app")])
+        self.assertEqual([(iv.start - T0, iv.end - T0, iv.value) for iv in h.intervals["wakelock"]],
+                         [(0, 1000, "*alarm*")])
 
     def test_no_history(self):
         with self.assertRaises(history.HistoryError):

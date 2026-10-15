@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core import history, html_report, metrics, session
+from powdroid.core import history, html_report, metrics, session
 from tests.fixtures import HISTORY, LEVEL_HISTORY, T0
 
 V3_COLUMNS = [
@@ -91,6 +91,12 @@ class MetricsTest(unittest.TestCase):
         self.assertAlmostEqual(s.energy_j, sum(r["energy_j"] or 0 for r in self.rows))
         self.assertAlmostEqual(s.mean_power_w, s.energy_j / s.measured_s)
         self.assertAlmostEqual(s.mean_current_ma, s.charge_mah / (s.measured_s / 3600))
+        # 48 of the 58 unplugged seconds are measured: the mean power over all 58 s.
+        self.assertAlmostEqual(s.extrapolated_energy_j, s.mean_power_w * 58)
+        self.assertEqual(metrics.summary_items(s)["extrapolated"],
+                         metrics.format_energy(s.mean_power_w * 58) + " ± 21 %")
+        measured = [r for r in self.rows if r["power_w"] is not None]
+        self.assertIsNone(metrics.summarize(measured[:2]).extrapolated_energy_j)  # fully measured
 
     def test_current_from_the_battery_level_without_coulomb_counter(self):
         hist = history.parse_history(LEVEL_HISTORY)
@@ -142,12 +148,38 @@ class MetricsTest(unittest.TestCase):
                 metrics.read_csv(path)
 
     def test_html_escapes_and_shows_warnings(self):
-        hist = history.parse_history(HISTORY.replace("com.example.app", "</script><b>x"))
+        hist = history.parse_history(HISTORY.replace("com.example.app", "<!--<script></script><b>x__ROWS__"))
         rows = metrics.compute_rows(hist, T0, T0 + 70000)
         result = session.Result(Path("out.csv"), rows, metrics.summarize(rows), ["Plugged <in>"])
         page = html_report.generate(result)
+        self.assertNotIn("<!--<script>", page)
         self.assertNotIn("</script><b>", page)
+        escaped = "\\u003c!--\\u003cscript\\u003e\\u003c/script\\u003e\\u003cb\\u003ex__ROWS__"
+        self.assertIn(escaped, page)  # and __ROWS__ is not replaced
         self.assertIn("Plugged &lt;in&gt;", page)
+
+    def test_html_is_self_contained(self):
+        result = session.Result(Path("out.csv"), self.rows, metrics.summarize(self.rows))
+        page = html_report.generate(result)
+        self.assertNotIn("<script src", page)
+        self.assertNotIn("sourceMappingURL", page)
+        self.assertIn("Chart.js v4.5.1", page)
+        self.assertEqual(page.count("<script>"), 2)  # Chart.js and the page's own
+        self.assertIn("decimation", page)
+        self.assertIn("<h2>Measurement</h2>", page)
+        self.assertIn("<td>Coulomb counter (1 mAh steps)</td>", page)
+
+    def test_phases_between_markers(self):
+        markers = [{"time_ms": T0 + 20000, "label": "Scroll"}, {"time_ms": T0 + 60000, "label": "Video"},
+                   {"time_ms": T0 + 99000, "label": "after the end"}]
+        phases = metrics.phase_summaries(self.rows, markers)
+        self.assertEqual([(p["label"], p["start_ms"] - T0, p["end_ms"] - T0) for p in phases],
+                         [("Start", 2000, 20000), ("Scroll", 20000, 60000), ("Video", 60000, 70000)])
+        self.assertAlmostEqual(sum(p["energy_j"] for p in phases), metrics.summarize(self.rows).energy_j)
+        # Plugged in from 45 to 55 s, then no current until the next counter reading at 65 s.
+        self.assertEqual([p["measured_s"] for p in phases], [18, 25, 5])
+        self.assertEqual(metrics.phase_summaries(self.rows, []), [])
+        self.assertEqual(metrics.phase_rows(phases)[1][:3], ["Scroll", "18s", "40s"])
 
 
 if __name__ == "__main__":
