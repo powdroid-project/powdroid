@@ -18,8 +18,9 @@ class HomePage(QWidget):
     open_report_requested = pyqtSignal(str)
     output_dir_changed = pyqtSignal(str)
     debug_toggled = pyqtSignal(bool)
+    perfetto_toggled = pyqtSignal(bool)
 
-    def __init__(self, output_dir, parent=None):
+    def __init__(self, output_dir, perfetto=True, parent=None):
         super().__init__(parent)
         self.device = None
         self.checks_ok = False
@@ -62,6 +63,13 @@ class HomePage(QWidget):
         row.addWidget(change)
         layout.addLayout(row)
         self.set_output_dir(output_dir)
+
+        # Perfetto
+        self.perfetto_check = QCheckBox(t("home.perfetto"))
+        self.perfetto_check.setToolTip(t("home.perfetto_tooltip"))
+        self.perfetto_check.setChecked(perfetto)
+        self.perfetto_check.toggled.connect(self.perfetto_toggled)
+        layout.addWidget(self.perfetto_check)
 
         # Debug log
         self.debug_check = QCheckBox(t("home.debug"))

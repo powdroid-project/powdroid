@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QToolButton, QVBoxLayout, QWidget,
 )
 
-from core import __version__, adb, config, debug, session
+from core import __version__, config, debug, session
 from gui import theme, workers
 from gui.i18n import set_language, t
 from gui.pages.home import HomePage
@@ -45,7 +45,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(self._header())
 
         self.stack = QStackedWidget()
-        self.home = HomePage(settings["output_dir"])
+        self.home = HomePage(settings["output_dir"], settings["perfetto"])
         self.record = RecordPage()
         scroll = QScrollArea()
         scroll.setWidget(self.home)
@@ -61,6 +61,7 @@ class MainWindow(QMainWindow):
         self.home.open_report_requested.connect(self._open_report)
         self.home.output_dir_changed.connect(lambda p: self._save(output_dir=p))
         self.home.debug_toggled.connect(self._toggle_debug)
+        self.home.perfetto_toggled.connect(lambda on: self._save(perfetto=on))
         self.home.set_debug_log(debug.log_path())
         self.record.finished.connect(self._show_report)
         self.record.cancelled.connect(self._go_home)
@@ -159,10 +160,9 @@ class MainWindow(QMainWindow):
         self.home.set_busy(True)
         logger.info("Preparing %s", device.serial)
 
-        def prepared(coulomb):
+        def prepared(preparation):
             self.home.set_busy(False)
-            # None (unknown) is treated as a counter: the results will tell.
-            self.record.begin(device, self.settings["output_dir"], coulomb is not False)
+            self.record.begin(device, self.settings["output_dir"], preparation)
             self.stack.setCurrentWidget(self.record)
             # The device may already be unplugged by the time preparation finished.
             self.record.on_device_changed(self.home.device)
@@ -171,7 +171,7 @@ class MainWindow(QMainWindow):
             self.home.set_busy(False)
             QMessageBox.warning(self, "PowDroid", message)
 
-        self._run(adb.prepare, device.serial, on_success=prepared, on_failure=failed)
+        self._run(session.prepare, device.serial, self.settings["perfetto"], on_success=prepared, on_failure=failed)
 
     def _open_report(self, csv_path):
         """Load a CSV chosen on the home page (in the background: it can be large)."""

@@ -159,6 +159,8 @@ def _script_json(value):
 
 def generate(result):
     """The HTML page of a session.Result."""
+    columns = metrics.columns(result.rows)
+    format_row = metrics.row_formatter(columns)
     cards_html = "".join(
         f'<div class="card"><div class="label">{html.escape(metrics.SUMMARY_LABELS[key])}</div>'
         f'<div class="value">{html.escape(value)}</div></div>'
@@ -173,8 +175,8 @@ def generate(result):
         .replace("__VERSION__", html.escape(__version__))
         .replace("__WARNINGS__", warnings_html)
         .replace("__CARDS__", cards_html)
-        .replace("__COLUMNS__", _script_json(metrics.COLUMNS))
-        .replace("__ROWS__", _script_json([metrics.format_row(row) for row in result.rows]))
+        .replace("__COLUMNS__", _script_json(columns))
+        .replace("__ROWS__", _script_json([format_row(row) for row in result.rows]))
     )
 
 

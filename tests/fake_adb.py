@@ -12,16 +12,34 @@ With $FAKE_ADB_NO_COULOMB set, it has no coulomb counter (it reports 0) and its 
 by 1 % (30 mAh) every 3 steps while unplugged instead.
 As on Android 14+, plug changes are written after the record of their step, with a negative
 time delta.
+
+Perfetto: the device has API level $FAKE_ADB_SDK (default 35) and its tracing service
+runs unless $FAKE_ADB_TRACED says otherwise (e.g. "stopped"). A trace started with
+`perfetto --background` is written when it is stopped (`perfetto_trace`): one battery
+poll every step, a current of 30 A and 10 A in turn every 400 ms while unplugged (2 A of
+charging while plugged in), a coulomb counter counting in steps of 50 µAh, and two power
+rails unless $FAKE_ADB_NO_RAILS is set. With $FAKE_ADB_OLD_PERFETTO, perfetto rejects
+BATTERY_COUNTER_VOLTAGE, as versions before 2024 do. With $FAKE_ADB_NO_PULL, `adb pull`
+fails (the trace is then copied with `exec-out cat`).
 """
 
 import os
+import re
+import shutil
 import sys
 import time
+
+from perfetto_trace import simulate
 
 DIR = os.environ.get("FAKE_ADB_DIR", "/tmp/fake_adb")
 SKEW_MS = int(os.environ.get("FAKE_ADB_SKEW_MS", "30000"))
 STEP_MS = int(os.environ.get("FAKE_ADB_STEP_MS", "1000"))  # time between history records
 NO_COULOMB = bool(os.environ.get("FAKE_ADB_NO_COULOMB"))
+SDK = os.environ.get("FAKE_ADB_SDK", "35")
+TRACED = os.environ.get("FAKE_ADB_TRACED", "running")
+TRACE_PATH = "/data/misc/perfetto-traces/powdroid.pftrace"
+PERFETTO_PID = 4242
+RAILS = [("S4M_VDD_CPUCL0", "CPU(LITTLE)", 1.5), ("VSYS_PWR_DISPLAY", "Display", 0.5)]
 
 
 def read(name, default=""):
@@ -80,6 +98,64 @@ def history(reset_ms, now_ms, plugs):
     return "\n".join(lines) + "\n9,0,l,bt,0,0,0\n9,0,l,pws,3000,0,0,0\n"
 
 
+def trace_current(plugs):
+    """The battery current of the fake trace (mA) at device time t: plugged in until the first unplug."""
+    def current(t):
+        plugged = True
+        for at, state in plugs:
+            if at <= t:
+                plugged = state
+        return -2000 if plugged else 30000 if t // 400 % 2 == 0 else 10000
+    return current
+
+
+def perfetto(command, now_ms, plugs):
+    """Answer the perfetto commands of core/perfetto.py; returns the exit code."""
+    running = read("perfetto")  # "<start ms> <voltage recorded>" while a trace runs
+    trace = os.path.join(DIR, "trace.pftrace")
+    if command.startswith("shell perfetto "):
+        config = sys.stdin.read()
+        if os.environ.get("FAKE_ADB_OLD_PERFETTO") and "BATTERY_COUNTER_VOLTAGE" in config:
+            print("Unexpected value 'BATTERY_COUNTER_VOLTAGE' for enum BatteryCounters", file=sys.stderr)
+            return 1
+        if 'name: "android.power"' not in config or f"-o {TRACE_PATH}" not in command:
+            print(f"fake perfetto: unexpected trace: {command}\n{config}", file=sys.stderr)
+            return 1
+        write("perfetto", f"{now_ms} {int('BATTERY_COUNTER_VOLTAGE' in config)}")
+        print(PERFETTO_PID)
+    elif "kill -TERM" in command and "echo stopped" in command:  # stop
+        if running:
+            start_ms, voltage = map(int, running.split())
+            with open(trace, "wb") as f:
+                f.write(simulate(start_ms, now_ms, trace_current(plugs), poll_ms=STEP_MS, resolution_uah=50,
+                                 voltage=bool(voltage), rails=[] if os.environ.get("FAKE_ADB_NO_RAILS") else RAILS))
+            os.remove(os.path.join(DIR, "perfetto"))
+        print("stopped" if running else "already-stopped")
+    elif "[ -d /proc/" in command:  # is it still running?
+        print("running" if running else "stopped")
+    elif "pkill -f" in command and re.search(command.split("'")[1], command):
+        return 143  # as on a phone: the pattern matches the command line of the shell running pkill
+    elif "kill -TERM" in command or "pkill" in command:  # cancel, or clean up a trace left running
+        for name in ("perfetto", "trace.pftrace"):
+            if os.path.exists(os.path.join(DIR, name)):
+                os.remove(os.path.join(DIR, name))
+    elif command == f"shell rm -f {TRACE_PATH}":
+        if os.path.exists(trace):
+            os.remove(trace)
+    elif command.startswith(f"pull {TRACE_PATH} "):
+        if os.environ.get("FAKE_ADB_NO_PULL") or not os.path.exists(trace):
+            print(f"adb: error: failed to stat remote object '{TRACE_PATH}': Permission denied", file=sys.stderr)
+            return 1
+        shutil.copyfile(trace, command.split(" ", 2)[2])
+        print(f"{TRACE_PATH}: 1 file pulled, 0 skipped.")
+    elif command == f"exec-out cat {TRACE_PATH}":
+        with open(trace, "rb") as f:
+            sys.stdout.buffer.write(f.read())
+    else:
+        return None
+    return 0
+
+
 def main(args):
     os.makedirs(DIR, exist_ok=True)
     if args[:1] == ["-s"]:
@@ -100,13 +176,19 @@ def main(args):
         if state:
             print(f"FAKE123\t{state}")
         return 0
-    if args[0] not in ("shell", "exec-out"):
+    if args[0] not in ("shell", "exec-out", "pull"):
         print(f"fake adb: unsupported command: {command}", file=sys.stderr)
         return 1
     if state != "device":
         print("adb: no devices/emulators found", file=sys.stderr)
         return 1
-    if "getprop" in command:
+    plugs = [(int(at), state == "1") for at, state in (e.split(":") for e in read("plugs").split())]
+    code = perfetto(command, now_ms, plugs)
+    if code is not None:
+        return code
+    if "init.svc.traced" in command:
+        print(f"{SDK}\n{TRACED}")
+    elif "getprop" in command:
         print("Google\nPixel 8 (fake)\n15")
     elif "--reset" in command:
         write("reset", str(now_ms))
@@ -117,7 +199,6 @@ def main(args):
     elif args[1:] == ["dumpsys", "battery"]:
         print(f"Current Battery Service state:\n  level: 90\n  Charge counter: {0 if NO_COULOMB else 3000000}")
     elif args[1:] == ["dumpsys", "batterystats", "-c"]:
-        plugs = [(int(at), state == "1") for at, state in (e.split(":") for e in read("plugs").split())]
         sys.stdout.write(history(int(read("reset", now_ms)), now_ms, plugs))
     return 0
 

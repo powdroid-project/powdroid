@@ -3,12 +3,13 @@
 import logging
 from datetime import datetime
 from enum import Enum, auto
+from functools import partial
 
 from PyQt6.QtCore import QElapsedTimer, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QMovie, QPixmap
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
-from core import session
+from core import perfetto, session
 from core.metrics import format_duration
 from gui import workers
 from gui.i18n import t
@@ -49,7 +50,7 @@ class RecordPage(QWidget):
         self.state = None
         self.device = None
         self.output_dir = None
-        self.coulomb = True
+        self.preparation = session.Preparation()
         self.start_time = None
         self.stop_time = None
         self.elapsed = QElapsedTimer()
@@ -79,9 +80,11 @@ class RecordPage(QWidget):
         self.hint = label(role="muted", wrap=True, align=CENTER)
         self.warning = label(t("record.replugged_warning"), "warning", wrap=True, align=CENTER)
         self.no_coulomb = label(t("record.no_coulomb"), "warning", wrap=True, align=CENTER)
+        self.perfetto_note = label(role="muted", wrap=True, align=CENTER)  # why Perfetto is not used
         self.error = label(role="error", wrap=True, align=CENTER)
         self.error.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        for w in (self.title, self.timer_label, self.hint, self.warning, self.no_coulomb, self.error):
+        for w in (self.title, self.timer_label, self.hint, self.warning, self.no_coulomb, self.perfetto_note,
+                  self.error):
             layout.addWidget(w)
         layout.addStretch()
 
@@ -98,14 +101,16 @@ class RecordPage(QWidget):
 
     # -- public API -------------------------------------------------------
 
-    def begin(self, device, output_dir, coulomb=True):
-        """Called once the device has been prepared (stats reset).
+    def begin(self, device, output_dir, preparation):
+        """Called once the device has been prepared (session.prepare: stats reset, Perfetto trace started).
 
-        coulomb=False warns that the battery has no coulomb counter, so the session must be long.
+        A battery without a coulomb counter is warned about (the session must be long), and
+        Perfetto not being available is mentioned.
         """
         self.device = device
         self.output_dir = output_dir
-        self.coulomb = coulomb
+        self.preparation = preparation
+        self.perfetto_note.setText(preparation.perfetto_notice or "")
         self.start_time = self.stop_time = None
         self._set_state(State.WAIT_UNPLUG)
 
@@ -160,7 +165,10 @@ class RecordPage(QWidget):
             self.tick.stop()
         self.timer_label.setVisible(recording or state == State.WAIT_REPLUG)
         self.warning.setVisible(False)
-        self.no_coulomb.setVisible(not self.coulomb and state in (State.WAIT_UNPLUG, State.RECORDING))
+        before_replug = state in (State.WAIT_UNPLUG, State.RECORDING)
+        # An unknown counter (None) is not warned about: the results will tell.
+        self.no_coulomb.setVisible(self.preparation.coulomb is False and before_replug)
+        self.perfetto_note.setVisible(bool(self.preparation.perfetto_notice) and before_replug)
         self.error.setVisible(state == State.ERROR)
         self.stop_button.setVisible(recording)
         self.retry_button.setVisible(state == State.ERROR)
@@ -178,8 +186,8 @@ class RecordPage(QWidget):
     def _collect(self):
         self._set_state(State.PROCESSING)
         self.collecting.emit(True)
-        task = workers.Task(session.collect, self.device, self.start_time, self.stop_time,
-                            self.output_dir, with_progress=True, parent=self)
+        task = workers.Task(partial(session.collect, preparation=self.preparation), self.device, self.start_time,
+                            self.stop_time, self.output_dir, with_progress=True, parent=self)
         task.progress.connect(lambda step: self.hint.setText(t(f"record.processing_{step}")))
         task.succeeded.connect(self._collected)
         task.failed.connect(self._failed)
@@ -199,5 +207,7 @@ class RecordPage(QWidget):
         logger.info("Recording cancelled")
         self.tick.stop()
         self.state = None
+        if self.preparation.trace:
+            workers.Task(perfetto.cancel, self.preparation.trace, parent=self).start()
         self.cancelled.emit()
 

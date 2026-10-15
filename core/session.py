@@ -2,7 +2,9 @@
 
 A session produces, next to each other: PowDroid_<date>.csv (the rows),
 PowDroid_<date>.json (device, session span, summary, warnings) and optionally
-PowDroid_<date>.html.
+PowDroid_<date>.html. The battery data comes from a Perfetto trace recorded during the
+session (core/perfetto.py), or from the batterystats history when Perfetto is not wanted or
+not available.
 """
 
 import json
@@ -11,7 +13,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from core import PowDroidError, __version__, adb, debug, history, html_report, metrics
+from core import PowDroidError, __version__, adb, debug, history, html_report, metrics, perfetto
 
 logger = logging.getLogger("powdroid.session")
 
@@ -29,6 +31,40 @@ class NoDataError(PowDroidError):
 
 
 @dataclass
+class Preparation:
+    """A device ready to record a session (see prepare)."""
+
+    coulomb: bool = None  # whether the battery reports its coulomb counter (None: unknown)
+    trace: perfetto.Trace = None  # the Perfetto trace recording the session, if any
+    perfetto_unavailable: str = None  # why Perfetto cannot be used on this phone, when it is wanted
+
+    @property
+    def perfetto_notice(self):
+        """What to tell the user when Perfetto is not available (None otherwise)."""
+        if self.perfetto_unavailable:
+            return (f"Perfetto is not available because {self.perfetto_unavailable}: "
+                    "PowDroid uses the battery statistics instead.")
+        return None
+
+
+def prepare(serial, use_perfetto=True):
+    """Before the phone is unplugged: reset the battery statistics and start the Perfetto trace.
+
+    Without Perfetto (use_perfetto=False, or it is not available on this phone), the
+    session is measured with the battery statistics alone. Why Perfetto is not available
+    is kept in perfetto_unavailable, and in the session JSON.
+    """
+    preparation = Preparation(adb.prepare(serial))
+    if use_perfetto:
+        try:
+            preparation.trace = perfetto.start(serial)
+        except perfetto.Unavailable as e:
+            logger.info("Perfetto is not available, using the battery statistics: %s", e)
+            preparation.perfetto_unavailable = str(e)
+    return preparation
+
+
+@dataclass
 class Result:
     """A processed session: its rows and what was concluded from them."""
 
@@ -43,12 +79,13 @@ class Result:
         return self.csv_path.with_suffix(".json")
 
 
-def collect(device, start, stop, out_dir, html=False, report=lambda step: None):
+def collect(device, start, stop, out_dir, html=False, report=lambda step: None, preparation=None):
     """After a session, read the battery statistics from the device and write the reports.
 
     start and stop are host datetimes; they are converted to device time using the
-    device clock offset measured now. report(step) is called with "offset", "dump"
-    and "parse" as the work progresses. Returns a Result.
+    device clock offset measured now. preparation is what prepare returned: its Perfetto
+    trace, if any, is stopped and copied. report(step) is called with "offset", "trace"
+    (with a trace), "dump" and "parse" as the work progresses. Returns a Result.
     """
     logger.info("Collecting the session recorded on %s from %s to %s (computer time) into %s",
                 device.serial, start, stop, out_dir)
@@ -60,14 +97,25 @@ def collect(device, start, stop, out_dir, html=False, report=lambda step: None):
     out_dir = Path(out_dir).expanduser()
     dump_path = out_dir / "dump" / f"batterystats_{stamp}.txt"
     dump_path.parent.mkdir(parents=True, exist_ok=True)
+    notes, trace_path = [], None
+    if preparation and preparation.trace:
+        report("trace")
+        try:
+            trace_path = perfetto.stop(preparation.trace, dump_path.with_name(f"perfetto_{stamp}.pftrace"))
+        except PowDroidError as e:  # AdbError, TraceError
+            logger.warning("The Perfetto trace could not be copied: %s", e, exc_info=True)
+            notes.append(f"The Perfetto trace could not be copied from the phone ({e}): the results come "
+                         "from the battery statistics.")
     report("dump")
     dump_ms = to_device_ms(datetime.now())
     adb.dump_batterystats(device.serial, dump_path)
     report("parse")
     meta = {"device": {k: v for k, v in asdict(device).items() if k != "state"},
             "clock_offset_ms": offset}
-    return process(dump_path, to_device_ms(start), to_device_ms(stop),
-                   out_dir / f"PowDroid_{stamp}.csv", html=html, meta=meta, dump_ms=dump_ms)
+    if preparation and preparation.perfetto_unavailable:
+        meta["perfetto_unavailable"] = preparation.perfetto_unavailable
+    return process(dump_path, to_device_ms(start), to_device_ms(stop), out_dir / f"PowDroid_{stamp}.csv",
+                   html=html, meta=meta, dump_ms=dump_ms, trace_path=trace_path, notes=notes)
 
 
 def unplugged_span(hist, start_ms, stop_ms):
@@ -134,7 +182,8 @@ def check(hist, requested, measured, summary, source):
             resolution, longer = "the battery level's 1 % resolution", f"a level drop of at least {steps:.0f} %"
         else:
             consumed = f"{summary.charge_mah:.1f} mAh were consumed"
-            resolution, longer = "the coulomb counter's 1 mAh resolution", f"at least {steps:.0f} mAh"
+            resolution = f"the coulomb counter's {source.resolution_mah:g} mAh resolution"
+            longer = f"at least {steps * source.resolution_mah:g} mAh"
         warnings.append(f"Only {consumed}: with {resolution}, energy and power are only known to about "
                         f"±{summary.uncertainty_pct or 100:.0f} %. Record a longer session "
                         f"({longer} for ±{MAX_UNCERTAINTY_PCT} %).")
@@ -146,15 +195,48 @@ def check(hist, requested, measured, summary, source):
     return warnings
 
 
-def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_ms=None):
+def _perfetto_source(trace_path, hist, notes):
+    """The trace's data, its metrics.ChargeSource and the battery history it gives (None if unusable).
+
+    Why it cannot be used is added to notes.
+    """
+    try:
+        trace = perfetto.parse_file(trace_path)
+    except (PowDroidError, OSError) as e:
+        logger.warning("Cannot read the Perfetto trace %s: %s", trace_path, e, exc_info=True)
+        notes.append(f"The Perfetto trace could not be read ({e}): the results come from the battery statistics.")
+        return None, None, hist
+    source = perfetto.charge_source(trace, hist.intervals["plugged"])
+    if source is None:
+        charges = {s.charge_uah for s in trace.samples if s.charge_uah is not None}
+        counter = f"always {charges.pop()} µAh" if len(charges) == 1 else "unusable" if charges else "not reported"
+        found = f"{len(trace.samples)} battery polls, charge counter {counter}"
+        logger.warning("The Perfetto trace has no usable coulomb counter (%s)", found)
+        notes.append(f"The Perfetto trace has no usable coulomb counter ({found}): the results come from the "
+                     "battery statistics.")
+        return trace, None, hist
+    logger.info("Current from the Perfetto trace's coulomb counter: %d readings, resolution %g mAh",
+                len(source.readings), source.resolution_mah)
+    return trace, source, perfetto.battery_history(hist, trace, source)
+
+
+def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_ms=None, trace_path=None,
+            notes=()):
     """Parse a batterystats dump and write the CSV, the session JSON and optionally the HTML report.
 
-    start_ms, stop_ms and dump_ms (when the dump was taken) are in device time.
+    start_ms, stop_ms and dump_ms (when the dump was taken) are in device time. With
+    trace_path, a Perfetto trace of the session, the battery readings come from the trace
+    if it has a coulomb counter, and its power rails are added. notes are warnings to add
+    (e.g. why the trace could not be copied from the phone).
     """
-    logger.info("Processing %s: session from %s to %s, dump taken at %s (device time)",
-                dump_path, debug.ms(start_ms), debug.ms(stop_ms), debug.ms(dump_ms))
+    logger.info("Processing %s: session from %s to %s, dump taken at %s (device time)%s",
+                dump_path, debug.ms(start_ms), debug.ms(stop_ms), debug.ms(dump_ms),
+                f", Perfetto trace {trace_path}" if trace_path else "")
+    notes = list(notes)
     hist = history.parse_file(dump_path, end_ms=dump_ms)
-    source = metrics.charge_source(hist)
+    trace, source, battery_hist = _perfetto_source(trace_path, hist, notes) if trace_path else (None, None, hist)
+    batterystats_source = metrics.charge_source(hist)
+    source = source or batterystats_source
     if source is None:
         values = {iv.value for iv in hist.intervals["charge_mah"]}
         found = (f"its charge counter stays at {values.pop()} mAh" if values
@@ -172,7 +254,9 @@ def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_
         raise NoDataError("The battery statistics say the phone stayed plugged in during the whole "
                           "session, so no energy can be measured. Unplug the phone when the recording "
                           f"page asks for it. The battery statistics are saved in {dump_path}.")
-    rows = metrics.compute_rows(hist, *measured, source)
+    rows = metrics.compute_rows(battery_hist, *measured, source)
+    if trace:
+        perfetto.add_rail_energy(rows, trace.rails)
     summary = metrics.summarize(rows, source.name, source.resolution_mah)
     logger.info("%d rows; summary: %s", len(rows), asdict(summary))
     if not summary.measured_s:
@@ -184,7 +268,13 @@ def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_
         raise NoDataError("No battery data found for the recorded session. Make sure the phone "
                           "stays unplugged and the session lasts long enough for the battery charge to drop.")
 
-    result = Result(Path(csv_path), rows, summary, check(hist, (start_ms, stop_ms), measured, summary, source))
+    warnings = notes + check(hist, (start_ms, stop_ms), measured, summary, source)
+    if source.name == metrics.PERFETTO:
+        first, last = trace.samples[0].time_ms, trace.samples[-1].time_ms
+        if first > measured[0] + perfetto.GAP_MS or last < measured[1] - perfetto.GAP_MS:
+            warnings.append(f"The Perfetto trace only covers the session from {(first - measured[0]) / 1000:.0f} s "
+                            f"to {(last - measured[0]) / 1000:.0f} s: the rest has no current.")
+    result = Result(Path(csv_path), rows, summary, warnings)
     result.csv_path.parent.mkdir(parents=True, exist_ok=True)
     metrics.write_csv(rows, result.csv_path)
     session = {
@@ -197,12 +287,18 @@ def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_
         "stop_ms": measured[1],
         "dump_ms": dump_ms,
         "dump_file": str(dump_path),
+        "trace_file": str(trace_path) if trace_path else None,
         "current_source": source.name,
         "battery_capacity_mah": hist.capacity_mah,
         "charge_update_interval_s": charge_update_interval_s(source.readings, *measured),
         "summary": asdict(summary),
         "warnings": result.warnings,
     }
+    if trace:
+        session["perfetto"] = perfetto.describe(trace, source if source.name == metrics.PERFETTO else None)
+        session["power_rails"] = perfetto.rail_totals(trace.rails, *measured)
+    if source.name == metrics.PERFETTO and batterystats_source:
+        session["batterystats_summary"] = _batterystats_summary(hist, measured, batterystats_source, summary)
     result.json_path.write_text(json.dumps(session, indent=2), encoding="utf-8")
     if html:
         result.html_path = html_report.write(result)
@@ -212,6 +308,15 @@ def process(dump_path, start_ms, stop_ms, csv_path, html=False, meta=None, dump_
         if path:
             logger.info("Written %s (%d bytes)", path, path.stat().st_size)
     return result
+
+
+def _batterystats_summary(hist, measured, source, summary):
+    """The summary the battery statistics alone give for the same session, to compare with Perfetto's."""
+    other = metrics.summarize(metrics.compute_rows(hist, *measured, source), source.name, source.resolution_mah)
+    logger.info("Same session from the battery statistics (%s): %.3f J and %.3f mAh over %.0f s measured, "
+                "against %.3f J and %.3f mAh over %.0f s from Perfetto", source.name, other.energy_j,
+                other.charge_mah, other.measured_s, summary.energy_j, summary.charge_mah, summary.measured_s)
+    return asdict(other)
 
 
 def load(csv_path):

@@ -7,7 +7,7 @@ import threading
 import traceback
 from datetime import datetime
 
-from core import PowDroidError, adb, checks, debug, metrics, session
+from core import PowDroidError, adb, checks, debug, metrics, perfetto, session
 
 logger = logging.getLogger("powdroid.cli")
 
@@ -36,7 +36,7 @@ def wait(connected, serial, verbose):
         log(f"Device {serial} {'connected' if connected else 'disconnected'}.")
 
 
-def with_spinner(message, func, *args):
+def with_spinner(message, func, *args, **kwargs):
     done = threading.Event()
 
     def spin():
@@ -50,13 +50,13 @@ def with_spinner(message, func, *args):
     thread = threading.Thread(target=spin, daemon=True)
     thread.start()
     try:
-        return func(*args)
+        return func(*args, **kwargs)
     finally:
         done.set()
         thread.join()
 
 
-def main(output_formats, out_dir, serial=None, verbose=False, show_traceback=False):
+def main(output_formats, out_dir, serial=None, verbose=False, show_traceback=False, use_perfetto=True):
     print(r"  ____               ____            _     _ ")
     print(r" |  _ \ _____      _|  _ \ _ __ ___ (_) __| |")
     print(r" | |_) / _ \ \ /\ / / | | | '__/ _ \| |/ _` |")
@@ -68,7 +68,7 @@ def main(output_formats, out_dir, serial=None, verbose=False, show_traceback=Fal
     if not run_checks():
         return 1
     try:
-        return _record(output_formats, out_dir, serial, verbose)
+        return _record(output_formats, out_dir, serial, verbose, use_perfetto)
     except (PowDroidError, OSError) as e:
         log(f"ERROR | {e}", logging.ERROR)
         logger.debug("Traceback:", exc_info=True)
@@ -77,7 +77,7 @@ def main(output_formats, out_dir, serial=None, verbose=False, show_traceback=Fal
         return 1
 
 
-def _record(output_formats, out_dir, serial, verbose):
+def _record(output_formats, out_dir, serial, verbose, use_perfetto):
     log("Step 1/4 | Preparing the device")
     device = adb.find_device(serial)
     if device is None or not device.ready:
@@ -89,9 +89,35 @@ def _record(output_formats, out_dir, serial, verbose):
         device = adb.find_device(serial)
     serial = device.serial
     log(f"Using {device.label} (Android {device.android_version or '?'}, {serial}).")
-    if adb.prepare(serial) is False:
+    preparation = session.prepare(serial, use_perfetto)
+    if preparation.coulomb is False:
         log(f"WARNING | {session.NO_COULOMB_NOTICE}", logging.WARNING)
+    if preparation.trace:
+        log(f"Perfetto trace started: battery readings every {perfetto.POLL_MS} ms.")
+    elif preparation.perfetto_notice:
+        log(preparation.perfetto_notice)
+    try:
+        result = _session(output_formats, out_dir, device, preparation, verbose)
+    finally:
+        if preparation.trace:  # not collected (error, Ctrl-C): stop it, if the phone is connected
+            perfetto.cancel(preparation.trace)
 
+    log("Step 4/4 | Results")
+    for path in (result.csv_path, result.json_path, result.html_path):
+        if path:
+            log(f"Written {path}")
+    figures = metrics.summary_items(result.summary)
+    log(f"Energy {figures['energy']}, average power {figures['mean_power']} over "
+        f"{figures['duration']} (measured time {figures['coverage']}).")
+    for warning in result.warnings:
+        log(f"WARNING | {warning}", logging.WARNING)
+    log("All tasks completed. Thank you for using PowDroid!")
+    return 0
+
+
+def _session(output_formats, out_dir, device, preparation, verbose):
+    """Record a session on the prepared device, then collect its data; returns the session.Result."""
+    serial = device.serial
     log("Step 2/4 | Recording")
     log("Unplug your device, then follow the instructions.")
     wait(False, serial, verbose)
@@ -105,17 +131,5 @@ def _record(output_formats, out_dir, serial, verbose):
     log("Step 3/4 | Collecting battery data")
     log("Please reconnect your device via USB.")
     wait(True, serial, verbose)
-    result = with_spinner("Reading battery statistics...",
-                          session.collect, device, start, stop, out_dir, "html" in output_formats)
-
-    log("Step 4/4 | Results")
-    for path in (result.csv_path, result.json_path, result.html_path):
-        if path:
-            log(f"Written {path}")
-    figures = metrics.summary_items(result.summary)
-    log(f"Energy {figures['energy']}, average power {figures['mean_power']} over "
-        f"{figures['duration']} (measured time {figures['coverage']}).")
-    for warning in result.warnings:
-        log(f"WARNING | {warning}", logging.WARNING)
-    log("All tasks completed. Thank you for using PowDroid!")
-    return 0
+    return with_spinner("Reading battery statistics...", session.collect, device, start, stop, out_dir,
+                        "html" in output_formats, preparation=preparation)

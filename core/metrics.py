@@ -7,7 +7,9 @@ plugged in, because the coulomb counter then measures charging, not consumption.
 
 The current comes from the battery's coulomb counter. Phones without one only report
 the battery level: the current is then estimated from the level drops, 1 % of the
-battery capacity at a time, which is far less precise.
+battery capacity at a time, which is far less precise. With a Perfetto trace
+(core/perfetto.py), the counter is read in µAh twice a second and the current samples
+shape the curve; the trace can add one energy column per power rail.
 """
 
 import csv
@@ -32,21 +34,27 @@ COLUMNS = [
     *BOOL_COLUMNS,
     "top_app", "wakelocks",
 ]
-INT_COLUMNS = {"start_ms", "end_ms", "duration_ms", "battery_level_pct", "voltage_mv", "charge_mah", "brightness"}
-FLOAT_COLUMNS = {"elapsed_s", "current_ma", "power_w", "energy_j", "consumed_mah", "temperature_c"}
+INT_COLUMNS = {"start_ms", "end_ms", "duration_ms", "battery_level_pct", "voltage_mv", "brightness"}
+FLOAT_COLUMNS = {"elapsed_s", "charge_mah", "current_ma", "power_w", "energy_j", "consumed_mah", "temperature_c"}
 TEXT_COLUMNS = {"top_app", "wakelocks"}
+# Optional columns after COLUMNS, from Perfetto traces: the energy (J) of each power rail,
+# e.g. rail_S4M_VDD_CPUCL0_j.
+RAIL_PREFIX = "rail_"
 
 
-COULOMB, LEVEL = "coulomb_counter", "battery_level"  # where the current comes from
+# Where the current comes from: the coulomb counter or the battery level in the battery
+# history, or the coulomb counter in a Perfetto trace.
+COULOMB, LEVEL, PERFETTO = "coulomb_counter", "battery_level", "perfetto"
 
 
 @dataclass
 class ChargeSource:
     """The battery charge readings the current is computed from."""
 
-    name: str  # COULOMB or LEVEL
+    name: str  # COULOMB, LEVEL or PERFETTO
     readings: list  # [Interval] of the remaining charge, in mAh
     resolution_mah: float  # charge step between readings: the uncertainty of a consumed charge
+    currents: list = None  # [Interval] of current (mA), if not computed from the readings (Perfetto)
 
 
 def _level_readings(history):
@@ -131,8 +139,12 @@ def compute_rows(history, start_ms, stop_ms, source=None):
     if stop_ms <= start_ms:
         return []
     source = source or charge_source(history)
+    currents = []
+    if source:
+        currents = source.currents if source.currents is not None else _currents(
+            source.readings, history.intervals["plugged"])
     times = sorted({start_ms, stop_ms} | {
-        t for intervals in history.intervals.values() for iv in intervals for t in (iv.start, iv.end)
+        t for intervals in (*history.intervals.values(), currents) for iv in intervals for t in (iv.start, iv.end)
         if start_ms < t < stop_ms})
     count = len(times) - 1
 
@@ -154,8 +166,8 @@ def compute_rows(history, start_ms, stop_ms, source=None):
     # Wakelocks can overlap and are all kept (below); other states keep one value per row.
     states = {metric: column(intervals) for metric, intervals in history.intervals.items()
               if metric != "wakelock"}
-    states["current_ma"] = column(_currents(source.readings, history.intervals["plugged"]) if source else [])
-    if not (source and source.name == COULOMB):
+    states["current_ma"] = column(currents)
+    if source is None or source.name == LEVEL:
         states["charge_mah"] = [None] * count  # no coulomb counter (its readings are 0)
     states["voltage_mv"] = _voltages(history, [(a + b) / 2 for a, b in zip(times, times[1:])])
     wakelocks = [set() for _ in range(count)]
@@ -196,7 +208,7 @@ def _formatter(column):
     """CSV text of a value of this column; None (unknown) is an empty cell."""
     if column in BOOL_COLUMNS:
         return lambda v: "1" if v else "0"
-    if column in FLOAT_COLUMNS:
+    if column in FLOAT_COLUMNS or column.startswith(RAIL_PREFIX):
         return lambda v: "" if v is None else f"{v:.10g}"
     return lambda v: "" if v is None else str(v)
 
@@ -211,19 +223,27 @@ def _parser(column):
     return lambda text: number(text) if text else None
 
 
-_FORMATTERS = [(c, _formatter(c)) for c in COLUMNS]
+def columns(rows):
+    """The columns of these rows: COLUMNS, then their power rail columns if they have any."""
+    return COLUMNS + ([c for c in rows[0] if c.startswith(RAIL_PREFIX)] if rows else [])
 
 
-def format_row(row):
-    """The CSV cells of a row, in COLUMNS order."""
-    return [format_cell(row[c]) for c, format_cell in _FORMATTERS]
+def row_formatter(names=COLUMNS):
+    """A function giving the CSV cells of a row, for these columns."""
+    formatters = [(c, _formatter(c)) for c in names]
+    return lambda row: [format_cell(row.get(c)) for c, format_cell in formatters]
+
+
+format_row = row_formatter()  # the CSV cells of a row, in COLUMNS order
 
 
 def write_csv(rows, path):
+    names = columns(rows)
+    format_cells = row_formatter(names)
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(COLUMNS)
-        writer.writerows(format_row(row) for row in rows)
+        writer.writerow(names)
+        writer.writerows(format_cells(row) for row in rows)
 
 
 class CsvFormatError(PowDroidError):

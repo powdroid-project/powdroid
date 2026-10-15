@@ -45,18 +45,18 @@ def is_available():
     return shutil.which("adb") is not None
 
 
-def _run(args, serial=None, timeout=30, stdout=subprocess.PIPE, poll=False):
+def _run(args, serial=None, timeout=30, stdout=subprocess.PIPE, poll=False, input=None):
     """Run an adb command and return its output (unless stdout is redirected, e.g. to a file).
 
     poll marks the commands repeated every second to watch the device: the debug log only
-    shows them when their answer changes.
+    shows them when their answer changes. input is text sent to the command's stdin.
     """
     cmd = ["adb"] + (["-s", serial] if serial else []) + list(args)
     if not poll and logger.isEnabledFor(logging.DEBUG):
-        logger.debug("Running %s", shlex.join(cmd))
+        logger.debug("Running %s%s", shlex.join(cmd), "\n" + debug.indent("stdin", input) if input else "")
     started = time.monotonic()
     try:
-        result = subprocess.run(cmd, stdout=stdout, stderr=subprocess.PIPE, timeout=timeout,
+        result = subprocess.run(cmd, input=input, stdout=stdout, stderr=subprocess.PIPE, timeout=timeout,
                                 text=True, errors="replace")
     except FileNotFoundError:
         _log_answer(cmd, poll, "adb not found in PATH")
@@ -243,3 +243,23 @@ def dump_batterystats(serial, path, timeout=300):
         _run(["exec-out", "dumpsys", "batterystats", "-c"], serial=serial, timeout=timeout, stdout=out)
     logger.info("Battery statistics transferred: %d bytes written to %s in %.1f s",
                 os.path.getsize(path), path, time.monotonic() - started)
+
+
+def shell(serial, command, timeout=30, input=None):
+    """Run a shell command line on the device and return its output (AdbError if it fails)."""
+    return _run(["shell", command], serial=serial, timeout=timeout, input=input)
+
+
+def pull(serial, remote, path, timeout=300):
+    """Copy a file from the device to path.
+
+    Some Android versions do not let `adb pull` read every folder the shell can read: the
+    file is then copied with `cat` (exec-out keeps it byte-exact).
+    """
+    try:
+        _run(["pull", remote, str(path)], serial=serial, timeout=timeout)
+    except AdbError:
+        logger.info("adb pull failed, copying %s with cat instead", remote)
+        with open(path, "wb") as out:
+            _run(["exec-out", "cat", remote], serial=serial, timeout=timeout, stdout=out)
+    logger.info("Copied %s to %s (%d bytes)", remote, path, os.path.getsize(path))

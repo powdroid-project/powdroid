@@ -22,6 +22,11 @@ def main():
     parser.add_argument("-s", "--serial", help="device serial, when several devices are connected")
     parser.add_argument("-v", "--verbose", action="store_true", help="print more details")
     parser.add_argument("-t", "--traceback", action="store_true", help="print the traceback on errors")
+    parser.add_argument("--no-perfetto", dest="perfetto", action="store_false",
+                        help="measure with the battery statistics only. By default, PowDroid records the battery "
+                             "with Perfetto on Android 10+ (µAh coulomb counter and current samples twice a second, "
+                             "plus the power rails of phones that measure them) and uses the battery statistics "
+                             "when Perfetto is not available")
     parser.add_argument("--debug", nargs="?", const="", metavar="FILE",
                         help="write a detailed log (adb commands and answers, data read, errors) to "
                              "FILE, by default DIR/logs/PowDroid_debug_<date>.log, to attach to bug reports")
@@ -42,7 +47,7 @@ def main():
         except OSError as e:
             parser.error(f"cannot write the debug log: {e}")
     try:
-        return cli_main(formats, args.dir, args.serial, args.verbose, args.traceback)
+        return cli_main(formats, args.dir, args.serial, args.verbose, args.traceback, args.perfetto)
     except KeyboardInterrupt:
         print("\n[PowDroid] Interrupted.")
         debug.logger.info("Interrupted by the user")

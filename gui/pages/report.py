@@ -135,6 +135,7 @@ class RowsModel(QAbstractTableModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.rows = []
+        self.columns = metrics.COLUMNS  # with the power rail columns of Perfetto sessions
         self.order = []  # indices of the visible rows, in display order
         self.sort_column, self.descending = "start_ms", False
         self.filter_text = ""
@@ -143,6 +144,7 @@ class RowsModel(QAbstractTableModel):
         """Show new rows, in time order and unfiltered."""
         self.beginResetModel()
         self.rows, self.order = rows, list(range(len(rows)))
+        self.columns = metrics.columns(rows)
         self.sort_column, self.descending, self.filter_text = "start_ms", False, ""
         self.endResetModel()
 
@@ -150,21 +152,21 @@ class RowsModel(QAbstractTableModel):
         return 0 if parent.isValid() else len(self.order)
 
     def columnCount(self, parent=QModelIndex()):
-        return 0 if parent.isValid() else len(metrics.COLUMNS)
+        return 0 if parent.isValid() else len(self.columns)
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
-            return metrics.COLUMNS[section]
+            return self.columns[section]
         return None
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if role != Qt.ItemDataRole.DisplayRole:
             return None
-        column = metrics.COLUMNS[index.column()]
+        column = self.columns[index.column()]
         return _display(column, self.rows[self.order[index.row()]][column])
 
     def sort(self, column, order=Qt.SortOrder.AscendingOrder):
-        self.sort_column = metrics.COLUMNS[column]
+        self.sort_column = self.columns[column]
         self.descending = order == Qt.SortOrder.DescendingOrder
         self._refresh()
 

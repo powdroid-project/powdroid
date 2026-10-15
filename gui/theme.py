@@ -68,6 +68,16 @@ QPushButton[role="primary"]:disabled {{ background: {border}; color: {muted}; }}
 QPushButton[role="danger"] {{
     background: {danger}; color: white; border: none; font-weight: 600; padding: 12px 18px;
 }}
+QCheckBox {{ background: transparent; spacing: 8px; }}
+QCheckBox:disabled {{ color: {muted}; }}
+QCheckBox::indicator {{
+    width: 14px; height: 14px; border: 2px solid {muted}; border-radius: 4px; background: {panel};
+}}
+QCheckBox::indicator:hover, QCheckBox::indicator:focus {{ border-color: {accent}; }}
+QCheckBox::indicator:checked {{ background: {accent}; border-color: {accent}; image: url("{checkmark}"); }}
+QCheckBox::indicator:checked:hover {{ background: {accent_hover}; border-color: {accent_hover}; }}
+QCheckBox::indicator:disabled {{ background: {panel_alt}; border-color: {border}; }}
+QCheckBox::indicator:checked:disabled {{ background: {muted}; border-color: {muted}; }}
 QToolButton {{ background: transparent; border: none; border-radius: 6px; padding: 4px; }}
 QToolButton:hover {{ background: {panel_alt}; }}
 QLineEdit {{
@@ -101,7 +111,8 @@ def colors(name):
 
 
 def stylesheet(name):
-    return STYLESHEET.format(**colors(name))
+    # Drawn by the stylesheet, a checked box needs its check mark image (white, on the accent colour).
+    return STYLESHEET.format(**colors(name), checkmark=(RESOURCES / "checkmark.svg").as_posix())
 
 
 def load_fonts(app):
