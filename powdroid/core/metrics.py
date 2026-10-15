@@ -364,17 +364,16 @@ def summary_items(s):
     voltage = ("—" if s.voltage_min_mv is None
                else f"{s.voltage_min_mv / 1000:.2f}–{s.voltage_max_mv / 1000:.2f} V")
     level = "—" if s.level_start_pct is None else f"{s.level_start_pct} → {s.level_end_pct} %"
-    coverage = f"{100 * s.measured_s / s.duration_s:.0f} %" if s.duration_s else "—"
     plus_minus = f" ± {s.uncertainty_pct:.0f} %" if s.uncertainty_pct and s.uncertainty_pct >= 1 else ""
     return {
         "duration": format_duration(s.duration_s),
         "energy": format_energy(s.energy_j) + plus_minus,
-        "mean_power": f"{s.mean_power_w:.3f} W" + plus_minus,
+        "mean_power": format_power(s.mean_power_w) + plus_minus,
         "mean_current": f"{s.mean_current_ma:.0f} mA",
         "charge": f"{s.charge_mah:.2f} mAh",
         "level": level,
         "voltage": voltage,
-        "coverage": coverage,
+        "coverage": format_coverage(s.measured_s, s.duration_s),
         "extrapolated": "—" if s.extrapolated_energy_j is None else format_energy(s.extrapolated_energy_j) + plus_minus,
         "source": source_label(s),
     }
@@ -382,6 +381,11 @@ def summary_items(s):
 
 def format_power(watts):
     return "—" if watts is None else f"{watts:.3f} W"
+
+
+def format_coverage(measured_s, duration_s):
+    """The measured part of a duration, in %."""
+    return f"{100 * measured_s / duration_s:.0f} %" if duration_s else "—"
 
 
 RAIL_HEADERS = ["Rail", "Subsystem", "Energy", "Mean power"]
@@ -432,8 +436,7 @@ PHASE_HEADERS = ["Phase", "From", "Duration", "Energy", "Average power", "Measur
 def phase_rows(phases):
     """Table rows of phase_summaries."""
     return [[p["label"], format_duration(p["from_s"]), format_duration(p["duration_s"]), format_energy(p["energy_j"]),
-             format_power(p["mean_power_w"]), f"{100 * p['measured_s'] / p['duration_s']:.0f} %" if p["duration_s"]
-             else "—"] for p in phases]
+             format_power(p["mean_power_w"]), format_coverage(p["measured_s"], p["duration_s"])] for p in phases]
 
 
 def measurement_lines(summary, details):

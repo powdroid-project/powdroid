@@ -6,14 +6,25 @@ from PyQt6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout
 from powdroid.gui.theme import set_role
 
 
-def label(text="", role=None, wrap=False, align=None):
+def label(text="", role=None, wrap=False, align=None, plain=False):
+    """A QLabel; plain=True for text from the phone or adb, never read as rich text."""
     widget = QLabel(text)
     if role:
         set_role(widget, role)
     widget.setWordWrap(wrap)
     if align is not None:
         widget.setAlignment(align)
+    if plain:
+        widget.setTextFormat(Qt.TextFormat.PlainText)
     return widget
+
+
+def clear_layout(layout):
+    """Remove the items of a layout, deleting their widgets."""
+    while layout.count():
+        widget = layout.takeAt(0).widget()
+        if widget is not None:
+            widget.deleteLater()
 
 
 def card(*widgets):

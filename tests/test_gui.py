@@ -33,8 +33,7 @@ class GuiTest(unittest.TestCase):
         for patcher in (mock.patch.object(config, "PATH", self.dir / "settings.json"),
                         mock.patch.object(QMessageBox, "warning", side_effect=self.fail_on_message),
                         mock.patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes)):
-            patcher.start()
-            self.addCleanup(patcher.stop)
+            self.enterContext(patcher)
         self.app = QApplication.instance() or QApplication([])
 
     def fail_on_message(self, parent, title, text, *args):

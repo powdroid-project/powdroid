@@ -375,6 +375,7 @@ class EndToEndTest(unittest.TestCase):
 
         time.sleep(0.5)
         self.set_state("device")  # plugged back in: the end of the session
+        time.sleep(0.2)  # the fake stamps the replug up to half a history step late: collect well after it
         output = io.StringIO()
         with mock.patch.object(sys, "argv", ["powdroid", "--collect-pending"]), redirect_stdout(output):
             self.assertEqual(main(), 0)
@@ -400,9 +401,7 @@ class EndToEndTest(unittest.TestCase):
         self.assertAlmostEqual((data["requested_stop_ms"] - data["requested_start_ms"]) / 1000, 1.0, delta=0.1)
 
     def use_wifi(self):
-        patcher = mock.patch.dict(os.environ, FAKE_ADB_WIRELESS="1")
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        self.enterContext(mock.patch.dict(os.environ, FAKE_ADB_WIRELESS="1"))
         self.set_state("device")
 
     def test_cli_over_wifi(self):

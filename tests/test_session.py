@@ -10,13 +10,16 @@ from tests.fixtures import (
 )
 
 
-class SessionTest(unittest.TestCase):
+class ProcessMixin:
     def run_process(self, text, start, stop, **kw):
         d = tempfile.TemporaryDirectory()
         self.addCleanup(d.cleanup)
         dump = Path(d.name) / "dump.txt"
         dump.write_text(text)
         return session.process(dump, T0 + start, T0 + stop, Path(d.name) / "PowDroid_x.csv", **kw)
+
+
+class SessionTest(ProcessMixin, unittest.TestCase):
 
     def test_outputs_and_json(self):
         result = self.run_process(HISTORY, 0, 70000, html=True, meta={"device": {"model": "Pixel"}})
@@ -148,18 +151,7 @@ class SessionTest(unittest.TestCase):
             self.run_process(HISTORY, 45000, 60000)  # only plugged / unknown rows
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-class CounterTest(unittest.TestCase):
-    def run_process(self, text, start, stop):
-        d = tempfile.TemporaryDirectory()
-        self.addCleanup(d.cleanup)
-        dump = Path(d.name) / "dump.txt"
-        dump.write_text(text)
-        return session.process(dump, T0 + start, T0 + stop, Path(d.name) / "PowDroid_x.csv")
-
+class CounterTest(ProcessMixin, unittest.TestCase):
     def test_counter_following_the_level(self):
         result = self.run_process(LEVEL_COUNTER_HISTORY, 0, 160_000)
         data = json.loads(result.json_path.read_text())
@@ -178,14 +170,10 @@ class CounterTest(unittest.TestCase):
         self.assertAlmostEqual(result.summary.charge_mah, 60, places=6)  # two 1 % drops of 3000 mAh
 
 
-class MarkerTest(unittest.TestCase):
+class MarkerTest(ProcessMixin, unittest.TestCase):
     def test_markers_and_renaming(self):
-        d = tempfile.TemporaryDirectory()
-        self.addCleanup(d.cleanup)
-        dump = Path(d.name) / "dump.txt"
-        dump.write_text(HISTORY)
         markers = [{"time_ms": T0 + 60000, "label": "Video"}, {"time_ms": T0 + 20000, "label": "Scroll"}]
-        result = session.process(dump, T0, T0 + 70000, Path(d.name) / "PowDroid_x.csv", html=True, markers=markers)
+        result = self.run_process(HISTORY, 0, 70000, html=True, markers=markers)
         self.assertEqual([(p["label"], p["marker"]) for p in result.phases],
                          [("Start", None), ("Scroll", 1), ("Video", 0)])
         session.rename_marker(result, 1, "Scrolling")
@@ -195,3 +183,7 @@ class MarkerTest(unittest.TestCase):
         self.assertIn("Scrolling", result.html_path.read_text())
         loaded = session.load(result.csv_path)
         self.assertEqual([p["label"] for p in loaded.phases], ["Start", "Scrolling", "Video"])
+
+
+if __name__ == "__main__":
+    unittest.main()

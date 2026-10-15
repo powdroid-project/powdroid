@@ -68,7 +68,7 @@ def clear(serial):
 def load_all():
     """The pending sessions (only those recording had started for), the most recent first."""
     sessions = []
-    for path in FOLDER.glob("*.json") if FOLDER.is_dir() else []:
+    for path in FOLDER.glob("*.json"):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             if data.get("start") is not None:
@@ -96,29 +96,33 @@ def _restore(data):
     return device, preparation
 
 
-def collect(data, report=lambda step: None):
+def collect(data):
     """Collect a pending session (its device must be connected) and delete it; returns the session.Result.
 
     A session whose stop was not recorded (PowDroid stopped while recording) ends now: the
     time after the phone was plugged back in is left out, as for any session.
     """
     device, preparation = _restore(data)
-    if not any(d.ready and d.serial == device.serial for d in adb.list_devices()):
+    if not adb.is_ready(device.serial):
         raise PowDroidError(f"Connect {device.label} ({device.serial}) to collect its session.")
     stop = data.get("stop")
     if stop is None:
         preparation.notes.append("PowDroid stopped while this session was recording: it was collected later, "
                                  "and ends when the phone was plugged back in (or when it was collected).")
         stop = time.time()
-    result = session.collect(device, data["start"], stop, data["out_dir"], data.get("html", False), report=report,
+    result = session.collect(device, data["start"], stop, data["out_dir"], data.get("html", False),
                              preparation=preparation, markers=data.get("markers", []))
     clear(device.serial)
     return result
 
 
-def discard(data):
-    """Give the phone back (best effort, if connected) and forget a pending session."""
-    device, preparation = _restore(data)
+def cancel(preparation):
+    """Give the phone back (best effort, if connected) and forget its pending session."""
     session.cancel(preparation)
-    clear(device.serial)
+    clear(preparation.serial)
+
+
+def discard(data):
+    """Cancel a pending session saved by save."""
+    cancel(_restore(data)[1])
 

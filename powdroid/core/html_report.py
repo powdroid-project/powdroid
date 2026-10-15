@@ -164,6 +164,9 @@ function render() {
   shown = q === "" ? order : order.filter(i => text[i].includes(q));
   tbody.replaceChildren(...shown.slice(0, limit).map(row));
   document.getElementById("count").textContent = shown.length + " / " + ROWS.length + " rows";
+  updateMore();
+}
+function updateMore() {
   const more = document.getElementById("more");
   more.hidden = shown.length <= limit;
   more.textContent = "Show " + Math.min(PAGE, shown.length - limit) + " more";
@@ -184,7 +187,11 @@ document.getElementById("search").addEventListener("input", () => {
   clearTimeout(filterTimer);
   filterTimer = setTimeout(() => { limit = PAGE; render(); }, 150);
 });
-document.getElementById("more").addEventListener("click", () => { limit += PAGE; render(); });
+document.getElementById("more").addEventListener("click", () => {  // only the new page is built
+  tbody.append(...shown.slice(limit, limit + PAGE).map(row));
+  limit += PAGE;
+  updateMore();
+});
 render();
 </script>
 </body>
@@ -208,24 +215,27 @@ def _chart_js():
 
 
 def _table(headers, rows):
-    head = "".join(f"<th>{html.escape(h)}</th>" for h in headers)
-    head = f"<thead><tr>{head}</tr></thead>" if any(headers) else ""
+    head = "".join(f"<th>{html.escape(h)}</th>" for h in headers or [])
+    head = f"<thead><tr>{head}</tr></thead>" if head else ""
     body = "".join("<tr>" + "".join(f"<td>{html.escape(str(cell))}</td>" for cell in row) + "</tr>" for row in rows)
     return f'<div class="table-wrap"><table>{head}<tbody>{body}</tbody></table></div>'
 
 
 def details_sections(result):
-    """(title, headers, rows) of the measurement details of a session.Result, for the HTML and GUI reports."""
-    details, sections = result.details or {}, []
-    phases = metrics.phase_rows(result.phases) if result.phases else []
+    """(kind, title, headers, rows) of the measurement details of a session.Result, for the HTML and GUI reports.
+
+    kind is "phases", "rails" or "measurement": (label, value) rows, without headers (None).
+    """
+    sections = []
+    phases = metrics.phase_rows(result.phases)
     if phases:
-        sections.append(("Phases (between markers)", metrics.PHASE_HEADERS, phases))
-    rails = metrics.rail_rows(details.get("power_rails") or [])
+        sections.append(("phases", "Phases (between markers)", metrics.PHASE_HEADERS, phases))
+    rails = metrics.rail_rows(result.details.get("power_rails") or [])
     if rails:
-        sections.append(("Power rails (on-device power monitors)", metrics.RAIL_HEADERS, rails))
-    lines = metrics.measurement_lines(result.summary, details)
+        sections.append(("rails", "Power rails (on-device power monitors)", metrics.RAIL_HEADERS, rails))
+    lines = metrics.measurement_lines(result.summary, result.details)
     if lines:
-        sections.append(("Measurement", ["", ""], lines))
+        sections.append(("measurement", "Measurement", None, lines))
     return sections
 
 
@@ -241,9 +251,9 @@ def generate(result):
     warnings_html = ('<section class="warnings"><ul>'
                      + "".join(f"<li>{html.escape(w)}</li>" for w in result.warnings)
                      + "</ul></section>") if result.warnings else ""
-    details_html = "".join(f'<section class="panel{" details" if headers == ["", ""] else ""}">'
+    details_html = "".join(f'<section class="panel{" details" if kind == "measurement" else ""}">'
                            f"<h2>{html.escape(title)}</h2>{_table(headers, rows)}</section>"
-                           for title, headers, rows in details_sections(result))
+                           for kind, title, headers, rows in details_sections(result))
     start_ms = result.rows[0]["start_ms"] if result.rows else 0
     markers = [{"x": (m["time_ms"] - start_ms) / 1000, "label": m["label"]} for m in result.markers]
     values = {

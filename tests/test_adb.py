@@ -14,9 +14,7 @@ class FindAdbTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.dir = Path(tmp.name)
-        patcher = mock.patch.object(adb, "_command", None)  # not found yet
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        self.enterContext(mock.patch.object(adb, "_command", None))  # not found yet
 
     def program(self, folder):
         path = self.dir / folder / adb.ADB_NAME
@@ -28,11 +26,8 @@ class FindAdbTest(unittest.TestCase):
     def environment(self, **variables):
         names = ("PATH", "ADB", "ANDROID_HOME", "ANDROID_SDK_ROOT", "LOCALAPPDATA")
         cleared = {name: "" for name in names}
-        patchers = [mock.patch.dict(os.environ, {**cleared, **variables}),
-                    mock.patch.object(Path, "home", return_value=self.dir / "home")]
-        for patcher in patchers:
-            patcher.start()
-            self.addCleanup(patcher.stop)
+        self.enterContext(mock.patch.dict(os.environ, {**cleared, **variables}))
+        self.enterContext(mock.patch.object(Path, "home", return_value=self.dir / "home"))
 
     def test_path_first_then_sdk_folders(self):
         on_path = self.program("bin")
@@ -48,7 +43,6 @@ class FindAdbTest(unittest.TestCase):
         self.environment(PATH=os.pathsep.join([".", "here"]))
         with mock.patch("os.getcwd", return_value=str(self.dir)):
             self.assertEqual(adb.candidates(), [])
-        self.assertFalse(adb.is_available())
         with self.assertRaisesRegex(adb.AdbError, "adb not found: install the Android SDK platform tools"):
             adb.command()
         result = checks.check_adb()

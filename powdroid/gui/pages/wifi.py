@@ -23,13 +23,12 @@ class WifiDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
-        usb = device is not None and device.ready and not device.wireless and not device.emulator
+        self.usb = device is not None and device.ready and not device.wireless and not device.emulator
         self.switch_button = QPushButton(t("wifi.switch"))
-        self.switch_button.setEnabled(usb)
+        self.switch_button.setEnabled(self.usb)
         self.switch_button.clicked.connect(self._switch)
-        switch_text = label(t("wifi.switch_hint", device=device.label) if usb else t("wifi.switch_unavailable"),
-                            "muted", wrap=True)
-        switch_text.setTextFormat(Qt.TextFormat.PlainText)
+        switch_text = label(t("wifi.switch_hint", device=device.label) if self.usb else t("wifi.switch_unavailable"),
+                            "muted", wrap=True, plain=True)
         layout.addWidget(card(label(t("wifi.switch_title"), "heading"), switch_text, self.switch_button)[0])
 
         self.pair_address = QLineEdit(placeholderText=t("wifi.pair_address"))
@@ -56,8 +55,7 @@ class WifiDialog(QDialog):
         connect_layout.addLayout(fields)
         layout.addWidget(frame)
 
-        self.status = label(role="muted", wrap=True)
-        self.status.setTextFormat(Qt.TextFormat.PlainText)  # quotes adb
+        self.status = label(role="muted", wrap=True, plain=True)  # quotes adb
         self.status.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(self.status)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
@@ -77,7 +75,6 @@ class WifiDialog(QDialog):
     def _run(self, func, *args, working, done):
         """Run an adb action in the background; done(result) gives the status text."""
         for button in (self.switch_button, self.pair_button, self.connect_button):
-            button.setProperty("was_enabled", button.isEnabled())
             button.setEnabled(False)
         self.status.setText(working)
         task = workers.Task(func, *args, parent=self)
@@ -86,8 +83,9 @@ class WifiDialog(QDialog):
         task.start()
 
     def _finished(self, text):
-        for button in (self.switch_button, self.pair_button, self.connect_button):
-            button.setEnabled(bool(button.property("was_enabled")))
+        self.switch_button.setEnabled(self.usb)
+        self.pair_button.setEnabled(True)
+        self.connect_button.setEnabled(True)
         self.status.setText(text)
 
     def _connected(self, serial):

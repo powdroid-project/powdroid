@@ -111,14 +111,6 @@ def command():
     return _command
 
 
-def is_available():
-    try:
-        command()
-    except AdbError:
-        return False
-    return True
-
-
 def _run(args, serial=None, timeout=30, stdout=subprocess.PIPE, poll=False, input=None):
     """Run an adb command and return its output (unless stdout is redirected, e.g. to a file).
 
@@ -281,17 +273,29 @@ class DeviceTracker:
         self.process.stdout.close()
 
 
-def wait_for(connected, serial=None):
-    """Block until the device is (dis)connected."""
+def is_ready(serial=None, devices=None):
+    """Whether adb lists the device (any device without a serial) as ready.
+
+    `devices` can be passed to reuse an `adb devices` listing the caller already has.
+    """
+    return any(d.ready and serial in (None, d.serial) for d in (list_devices() if devices is None else devices))
+
+
+def _wait_until(condition, interval=1.0):
+    """Block until condition() is true; an AdbError (e.g. Wi-Fi briefly lost) counts as false."""
     while True:
         try:
-            if any(d.ready and serial in (None, d.serial) for d in list_devices(poll=True)) == connected:
-                logger.info("Device %s%s", "connected" if connected else "disconnected",
-                            f" ({serial})" if serial else "")
+            if condition():
                 return
         except AdbError:
             pass  # in the debug log
-        time.sleep(1)
+        time.sleep(interval)
+
+
+def wait_for(connected, serial=None):
+    """Block until the device is (dis)connected."""
+    _wait_until(lambda: is_ready(serial, list_devices(poll=True)) == connected)
+    logger.info("Device %s%s", "connected" if connected else "disconnected", f" ({serial})" if serial else "")
 
 
 def log_diagnostics(serial, moment, battery=True):
@@ -353,14 +357,8 @@ def has_coulomb_counter(serial):
 
 def wait_for_power(plugged, serial, interval=1.0):
     """Block until the phone is (un)plugged, according to `dumpsys battery` (for Wi-Fi connections)."""
-    while True:
-        try:
-            if battery_status(serial, poll=True).plugged == plugged:
-                logger.info("Phone %s", "plugged in" if plugged else "running on battery")
-                return
-        except AdbError:
-            pass  # e.g. Wi-Fi briefly lost; in the debug log
-        time.sleep(interval)
+    _wait_until(lambda: battery_status(serial, poll=True).plugged == plugged, interval)
+    logger.info("Phone %s", "plugged in" if plugged else "running on battery")
 
 
 def connect(address):

@@ -62,8 +62,7 @@ class RecordPage(QWidget):
         self.state = None
         self.device = None
         self.output_dir = None
-        self.preparation = session.Preparation()
-        self.wireless = False  # the device is connected over Wi-Fi
+        self.preparation = None  # session.Preparation
         self.connected = True  # whether adb lists the device as ready
         self.start_time = None
         self.stop_time = None
@@ -96,10 +95,8 @@ class RecordPage(QWidget):
         self.warning = label(t("record.replugged_warning"), "warning", wrap=True, align=CENTER)
         self.no_coulomb = label(t("record.no_coulomb"), "warning", wrap=True, align=CENTER)
         self.perfetto_note = label(role="muted", wrap=True, align=CENTER)  # why Perfetto is not used
-        self.marker_list = label(role="muted", wrap=True, align=CENTER)
-        self.marker_list.setTextFormat(Qt.TextFormat.PlainText)
-        self.error = label(role="error", wrap=True, align=CENTER)
-        self.error.setTextFormat(Qt.TextFormat.PlainText)  # may quote adb output
+        self.marker_list = label(role="muted", wrap=True, align=CENTER, plain=True)
+        self.error = label(role="error", wrap=True, align=CENTER, plain=True)  # may quote adb output
         self.error.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         for w in (self.title, self.timer_label, self.hint, self.warning, self.no_coulomb, self.perfetto_note,
                   self.marker_list, self.error):
@@ -132,15 +129,15 @@ class RecordPage(QWidget):
         self.device = device
         self.output_dir = output_dir
         self.preparation = preparation
-        self.wireless, self.connected = device.wireless, True
+        self.connected = True
         self.perfetto_note.setText(preparation.perfetto_notice or "")
         self.start_time = self.stop_time = None
         self.markers = []
         for state, step in zip(STEPS, self.step_labels):
-            step.setText(t(f"record.{WIFI_UI.get(state, STATE_UI[state])[0] if self.wireless else STATE_UI[state][0]}"))
+            step.setText(t(f"record.{self._texts(state)[0]}"))
         self._save()
         self._set_state(State.WAIT_UNPLUG)
-        if self.wireless:
+        if device.wireless:
             self._poll_power()
 
     def add_marker(self):
@@ -162,11 +159,11 @@ class RecordPage(QWidget):
         """Follow the recorded device (other devices may be connected too)."""
         if self.state is None:
             return  # not recording
-        connected = self.connected = any(d.ready and d.serial == self.device.serial for d in devices)
+        connected = self.connected = adb.is_ready(self.device.serial, devices)
         logger.debug("Device %s while %s", "connected" if connected else "disconnected", self.state.name)
         if self.state == State.WAIT_REPLUG and connected:
             self._collect()
-        elif self.wireless:
+        elif self.device.wireless:
             return  # the connection says nothing about the power: see _poll_power
         elif self.state == State.WAIT_UNPLUG and not connected:
             self._start_recording()
@@ -177,7 +174,7 @@ class RecordPage(QWidget):
         """Over Wi-Fi, while waiting for the phone to run on battery: ask it every second."""
         if self.state != State.WAIT_UNPLUG:
             return
-        task = workers.Task(adb.battery_status, self.device.serial, parent=self)
+        task = workers.Task(partial(adb.battery_status, poll=True), self.device.serial, parent=self)
         task.succeeded.connect(self._power_known)
         task.failed.connect(lambda message: QTimer.singleShot(POWER_POLL_MS, self._poll_power))
         task.start()
@@ -192,6 +189,11 @@ class RecordPage(QWidget):
 
     # -- transitions ------------------------------------------------------
 
+    def _texts(self, state):
+        """The title and hint keys of a state (over Wi-Fi, those of WIFI_UI replace them)."""
+        title, hint, _ = STATE_UI[state]
+        return WIFI_UI.get(state, (title, hint)) if self.device.wireless else (title, hint)
+
     def _set_state(self, state):
         logger.info("Recording page: %s", state.name)
         self.state = state
@@ -202,9 +204,7 @@ class RecordPage(QWidget):
             font.setBold(i == current)
             step.setFont(font)
 
-        title, hint, image = STATE_UI[state]
-        if self.wireless:
-            title, hint = WIFI_UI.get(state, (title, hint))
+        (title, hint), image = self._texts(state), STATE_UI[state][2]
         self.title.setText(t(f"record.{title}"))
         self.hint.setText(t(f"record.{hint}") if hint else "")
         if state == State.RECORDING:
@@ -257,7 +257,7 @@ class RecordPage(QWidget):
         self._save()
         logger.info("Recording from %s to %s", *(datetime.fromtimestamp(t) for t in (self.start_time, self.stop_time)))
         self._update_timer()
-        if self.wireless and self.connected:
+        if self.device.wireless and self.connected:
             self._collect()  # no need to plug the phone back in
         else:
             self._set_state(State.WAIT_REPLUG)
@@ -301,8 +301,7 @@ class RecordPage(QWidget):
         if self.state == State.WAIT_UNPLUG:
             logger.info("Quitting before recording: the session is cancelled")
             self.state = None
-            session.cancel(self.preparation)
-            pending.clear(self.device.serial)
+            pending.cancel(self.preparation)
         elif self.state in (State.RECORDING, State.WAIT_REPLUG, State.ERROR):
             logger.info("Quitting while %s: the session is kept to be collected later", self.state.name)
             self.tick.stop()

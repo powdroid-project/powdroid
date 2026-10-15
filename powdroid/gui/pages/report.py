@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (  # noqa: E402
 from powdroid.core import html_report, metrics, session  # noqa: E402
 from powdroid.gui.i18n import t  # noqa: E402
 from powdroid.gui.theme import COMPONENT_COLORS, colors, set_role  # noqa: E402
-from powdroid.gui.widgets import ElidedLabel, card, label  # noqa: E402
+from powdroid.gui.widgets import ElidedLabel, card, clear_layout, label  # noqa: E402
 
 
 def _local(ms):
@@ -219,8 +219,7 @@ class ReportPage(QWidget):
         self.subtitle.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(self.subtitle)
 
-        self.warnings = label(role="warning", wrap=True)
-        self.warnings.setTextFormat(Qt.TextFormat.PlainText)  # may quote app names and adb output
+        self.warnings = label(role="warning", wrap=True, plain=True)  # may quote app names and adb output
         layout.addWidget(self.warnings)
 
         stats = QGridLayout()
@@ -303,20 +302,17 @@ class ReportPage(QWidget):
         self.set_theme(theme)
 
     def _show_details(self, result):
-        while self.details_layout.count():
-            widget = self.details_layout.takeAt(0).widget()
-            if widget is not None:
-                widget.deleteLater()
-        for title, headers, rows in html_report.details_sections(result):
+        clear_layout(self.details_layout)
+        for kind, title, headers, rows in html_report.details_sections(result):
             self.details_layout.addWidget(label(title, "heading"))
-            table = QTableWidget(len(rows), len(headers))
+            table = QTableWidget(len(rows), len(rows[0]))
             table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
             table.verticalHeader().hide()
-            if any(headers):
+            if headers:
                 table.setHorizontalHeaderLabels(headers)
             else:
                 table.horizontalHeader().hide()
-            phases = headers == metrics.PHASE_HEADERS
+            phases = kind == "phases"
             for r, cells in enumerate(rows):
                 for c, cell in enumerate(cells):
                     item = QTableWidgetItem(str(cell))
@@ -331,7 +327,7 @@ class ReportPage(QWidget):
                 self.phases_table = table
             table.resizeColumnsToContents()
             table.horizontalHeader().setStretchLastSection(True)
-            height = table.horizontalHeader().height() * any(headers) + sum(
+            height = table.horizontalHeader().height() * bool(headers) + sum(
                 table.rowHeight(r) for r in range(len(rows))) + 2 * table.frameWidth()
             table.setFixedHeight(height)
             self.details_layout.addWidget(table)

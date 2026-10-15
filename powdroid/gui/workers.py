@@ -36,15 +36,13 @@ class DeviceWatcher(QThread):
         self.paused = paused
 
     def describe(self, devices):
+        properties = {}  # of the ready devices only: a device connected again is described again
         for device in devices:
-            known = self.properties.get(device.serial)
-            if device.ready and known is None:
-                known = self.properties[device.serial] = adb.describe(device)
             if device.ready:
+                known = properties[device.serial] = self.properties.get(device.serial) or adb.describe(device)
                 device.manufacturer, device.model, device.android_version = (
                     known.manufacturer, known.model, known.android_version)
-        ready = {d.serial for d in devices if d.ready}
-        self.properties = {serial: d for serial, d in self.properties.items() if serial in ready}
+        self.properties = properties
         return devices
 
     def publish(self, devices):

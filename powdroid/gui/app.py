@@ -181,22 +181,21 @@ class MainWindow(QMainWindow):
         self.home.set_busy(True)
         self.home.set_pending([])  # until collected
 
-        def collected(result):
+        def done():
+            self.watcher.set_paused(False)
             self.home.set_busy(False)
             self.home.set_pending(pending.load_all())
+
+        def collected(result):
+            done()
             self._show_report(result)
 
         def failed(message):
-            self.home.set_busy(False)
-            self.home.set_pending(pending.load_all())
+            done()
             QMessageBox.warning(self, "PowDroid", t("app.pending_error", error=message))
 
         self.watcher.set_paused(True)  # no device polling during the dump
-        task = workers.Task(pending.collect, data, parent=self)
-        task.finished.connect(lambda: self.watcher.set_paused(False))
-        task.succeeded.connect(collected)
-        task.failed.connect(failed)
-        task.start()
+        self._run(pending.collect, data, on_success=collected, on_failure=failed)
 
     def _discard_pending(self, data):
         pending.clear(data["device"]["serial"])  # at once; the phone is given back in the background

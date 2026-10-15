@@ -19,8 +19,7 @@ def use_fake_adb(test, directory, **variables):
                     mock.patch.object(pending, "FOLDER", Path(directory).parent / "pending"),
                     mock.patch.dict(os.environ, {"FAKE_ADB_DIR": str(directory), "FAKE_ADB_STEP_MS": "100",
                                                  **variables})):
-        patcher.start()
-        test.addCleanup(patcher.stop)
+        test.enterContext(patcher)
 
 
 def set_fake_state(directory, state):

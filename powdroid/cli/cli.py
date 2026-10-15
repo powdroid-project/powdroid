@@ -18,6 +18,14 @@ def log(message, level=logging.INFO):
     logger.log(level, message)
 
 
+def _report_error(e, show_traceback):
+    """Print an error, with its traceback in the debug log (and on screen with -t)."""
+    log(f"ERROR | {e}", logging.ERROR)
+    logger.debug("Traceback:", exc_info=True)
+    if show_traceback:
+        traceback.print_exc()
+
+
 def run_checks():
     log("Checking configuration...")
     ok = True
@@ -87,14 +95,11 @@ def main(output_formats, out_dir, serial=None, verbose=False, show_traceback=Fal
             log(f"Connected to {serial} over Wi-Fi.")
         return _record(output_formats, out_dir, serial, verbose, use_perfetto, duration)
     except (PowDroidError, OSError) as e:
-        log(f"ERROR | {e}", logging.ERROR)
-        logger.debug("Traceback:", exc_info=True)
-        if show_traceback:
-            traceback.print_exc()
+        _report_error(e, show_traceback)
         return 1
 
 
-def _record(output_formats, out_dir, serial, verbose, use_perfetto, duration=None):
+def _record(output_formats, out_dir, serial, verbose, use_perfetto, duration):
     log("Step 1/4 | Preparing the device")
     devices = adb.list_devices()
     device = adb.find_device(serial, devices)
@@ -127,14 +132,13 @@ def _record(output_formats, out_dir, serial, verbose, use_perfetto, duration=Non
         pending.save(device, preparation, out_dir, html, **progress)
 
     try:
-        result = _session(output_formats, out_dir, device, preparation, verbose, duration, save)
+        result = _session(html, out_dir, device, preparation, verbose, duration, save)
     except session.NoDataError:
         pending.clear(serial)  # collected, but without usable data: nothing to collect again
         raise
     except BaseException:  # error or Ctrl-C
         if progress["start"] is None:  # not recording yet: give the phone back if it is connected
-            session.cancel(preparation)
-            pending.clear(serial)
+            pending.cancel(preparation)
         else:  # recorded: kept on the phone, to be collected later
             log("The recorded session is kept: collect it later with powdroid --collect-pending.")
         raise
@@ -174,15 +178,12 @@ def collect_pending(serial=None, verbose=False, show_traceback=False):
     for data in sessions:
         log(f"Collecting the session of {pending.describe(data)}")
         try:
-            if not any(d.ready and d.serial == data["device"]["serial"] for d in adb.list_devices()):
+            if not adb.is_ready(data["device"]["serial"]):
                 log("Please connect this phone.")
                 wait(True, data["device"]["serial"], verbose)
             result = with_spinner("Reading battery statistics...", pending.collect, data)
         except (PowDroidError, OSError) as e:
-            log(f"ERROR | {e}", logging.ERROR)
-            logger.debug("Traceback:", exc_info=True)
-            if show_traceback:
-                traceback.print_exc()
+            _report_error(e, show_traceback)
             code = 1
             continue
         print_result(result)
@@ -195,16 +196,13 @@ def reprocess(json_path, output_formats, out_dir=None, show_traceback=False):
         log(f"Processing {json_path} again")
         result = session.reprocess(json_path, out_dir, "html" in output_formats)
     except (PowDroidError, OSError) as e:
-        log(f"ERROR | {e}", logging.ERROR)
-        logger.debug("Traceback:", exc_info=True)
-        if show_traceback:
-            traceback.print_exc()
+        _report_error(e, show_traceback)
         return 1
     print_result(result)
     return 0
 
 
-def _session(output_formats, out_dir, device, preparation, verbose, duration=None, save=lambda **changes: None):
+def _session(html, out_dir, device, preparation, verbose, duration, save):
     """Record a session on the prepared device, then collect its data; returns the session.Result.
 
     Over USB, the session starts once the phone is unplugged and the data is read once it is
@@ -238,7 +236,7 @@ def _session(output_formats, out_dir, device, preparation, verbose, duration=Non
         log(f"Recording since {time.strftime('%H:%M:%S', time.localtime(start))}. To mark a moment of the "
             "session (e.g. the start of a scenario step), type a label and press ENTER.")
         while True:
-            label = (input("=> Press ENTER alone once you have finished your test session: ") or "").strip()
+            label = input("=> Press ENTER alone once you have finished your test session: ").strip()
             if not label:
                 break
             markers.append({"time": time.time(), "label": label})
@@ -252,8 +250,8 @@ def _session(output_formats, out_dir, device, preparation, verbose, duration=Non
     if not device.wireless:
         log("Please reconnect your device via USB.")
         wait(True, serial, verbose)
-    elif not any(d.ready and d.serial == serial for d in adb.list_devices()):
+    elif not adb.is_ready(serial):
         log("The phone is not connected over Wi-Fi any more: waiting for it to come back.")
         wait(True, serial, verbose)
-    return with_spinner("Reading battery statistics...", session.collect, device, start, stop, out_dir,
-                        "html" in output_formats, preparation=preparation, markers=markers)
+    return with_spinner("Reading battery statistics...", session.collect, device, start, stop, out_dir, html,
+                        preparation=preparation, markers=markers)

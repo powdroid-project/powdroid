@@ -11,15 +11,7 @@ from PyQt6.QtWidgets import (
 from powdroid.core import adb, pending
 from powdroid.gui.i18n import t
 from powdroid.gui.theme import set_role
-from powdroid.gui.widgets import ElidedLabel, card, label
-
-
-# Title and hint keys (home.*) shown for a device that is not ready, by its adb state.
-STATE_TEXTS = {
-    "unauthorized": ("unauthorized", "unauthorized_hint"),
-    "no permissions": ("no_permissions", "no_permissions_hint"),
-    "offline": ("offline", "offline_hint"),
-}
+from powdroid.gui.widgets import ElidedLabel, card, clear_layout, label
 
 
 def device_text(device):
@@ -57,10 +49,8 @@ class HomePage(QWidget):
         # Device status, with a choice when several devices are connected
         self.device_choice = QComboBox()
         self.device_choice.currentIndexChanged.connect(self._device_chosen)
-        self.device_name = label(role="heading")
-        self.device_name.setTextFormat(Qt.TextFormat.PlainText)  # from the phone
-        self.device_detail = label(role="muted", wrap=True)
-        self.device_detail.setTextFormat(Qt.TextFormat.PlainText)
+        self.device_name = label(role="heading", plain=True)  # from the phone
+        self.device_detail = label(role="muted", wrap=True, plain=True)
         wifi_button = QPushButton(t("home.wifi_button"))
         wifi_button.setToolTip(t("home.wifi_tooltip"))
         wifi_button.clicked.connect(self._connect_wifi)
@@ -179,13 +169,9 @@ class HomePage(QWidget):
 
     def set_pending(self, sessions):
         """Offer to collect or discard the sessions recorded but not collected."""
-        while self.pending_box.count():
-            widget = self.pending_box.takeAt(0).widget()
-            if widget is not None:
-                widget.deleteLater()
+        clear_layout(self.pending_box)
         for data in sessions:
-            text = label(t("home.pending", session=pending.describe(data)), "warning", wrap=True)
-            text.setTextFormat(Qt.TextFormat.PlainText)
+            text = label(t("home.pending", session=pending.describe(data)), "warning", wrap=True, plain=True)
             collect, discard = QPushButton(t("home.pending_collect")), QPushButton(t("home.pending_discard"))
             set_role(collect, "primary")
             collect.setToolTip(t("home.pending_collect_tooltip"))
@@ -224,10 +210,8 @@ class HomePage(QWidget):
 
     def _wifi_connected(self, serial):
         """Select the phone connected over Wi-Fi, now or once the device list shows it."""
-        if serial in [d.serial for d in self.devices]:
-            self.device_choice.setCurrentIndex(self.device_choice.findData(serial))
-        else:
-            self.wanted_serial = serial
+        self.wanted_serial = serial
+        self.set_devices(self.devices)
 
     def _device_chosen(self, index):
         self._show_device(self.devices[index] if 0 <= index < len(self.devices) else None)
@@ -238,9 +222,10 @@ class HomePage(QWidget):
             self.device_name.setText(t("home.no_device"))
             self.device_detail.setText(t("home.no_device_hint"))
         elif not device.ready:
-            title, hint = STATE_TEXTS.get(device.state, ("not_ready", "not_ready_hint"))
-            self.device_name.setText(t(f"home.{title}", state=device.state))
-            self.device_detail.setText(t(f"home.{hint}"))
+            # Texts home.<state> and home.<state>_hint, e.g. home.no_permissions_hint
+            key = device.state.replace(" ", "_") if device.state in adb.STATE_HINTS else "not_ready"
+            self.device_name.setText(t(f"home.{key}", state=device.state))
+            self.device_detail.setText(t(f"home.{key}_hint"))
         else:
             self.device_name.setText(device_text(device))
             self.device_detail.setText(

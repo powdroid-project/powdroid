@@ -43,7 +43,7 @@ class NoDataError(PowDroidError):
 class Preparation:
     """A device ready to record a session (see prepare)."""
 
-    serial: str = None
+    serial: str
     coulomb: bool = None  # whether the battery reports its coulomb counter (None: unknown)
     trace: perfetto.Trace = None  # the Perfetto trace recording the session, if any
     perfetto_unavailable: str = None  # why Perfetto cannot be used on this phone, when it is wanted
@@ -58,6 +58,12 @@ class Preparation:
             return (f"Perfetto is not available because {self.perfetto_unavailable}: "
                     "PowDroid uses the battery statistics instead.")
         return None
+
+    def restore(self):
+        """Turn the battery statistics options off again (adb.restore), unless already done."""
+        if not self.restored:
+            adb.restore(self.serial)
+            self.restored = True
 
 
 def prepare(serial, use_perfetto=True):
@@ -87,9 +93,7 @@ def cancel(preparation):
     """
     if preparation.trace:
         perfetto.cancel(preparation.trace)
-    if preparation.serial and not preparation.restored:
-        adb.restore(preparation.serial)
-        preparation.restored = True
+    preparation.restore()
 
 
 @dataclass
@@ -110,16 +114,15 @@ class Result:
         return self.csv_path.with_suffix(".json")
 
 
-def collect(device, start, stop, out_dir, html=False, report=lambda step: None, preparation=None, markers=()):
+def collect(device, start, stop, out_dir, html=False, report=lambda step: None, *, preparation, markers=()):
     """After a session, read the battery statistics from the device and write the reports.
 
-    start and stop are computer times (epoch seconds, as time.time() gives, or datetimes);
-    they are converted to device time using the device clock offset measured now.
-    preparation is what prepare returned: its Perfetto trace, if any, is stopped and copied.
-    report(step) is called with "offset", "trace" (with a trace), "dump" and "parse" as the
-    work progresses. markers are [{"time": computer time, "label": text}]. Returns a Result.
+    start and stop are computer times (epoch seconds, as time.time() gives); they are
+    converted to device time using the device clock offset measured now. preparation is
+    what prepare returned: its Perfetto trace, if any, is stopped and copied. report(step)
+    is called with "offset", "trace" (with a trace), "dump" and "parse" as the work
+    progresses. markers are [{"time": computer time, "label": text}]. Returns a Result.
     """
-    start, stop = (t.timestamp() if isinstance(t, datetime) else t for t in (start, stop))
     logger.info("Collecting the session recorded on %s from %s to %s (computer time) into %s",
                 device.serial, debug.ms(start * 1000), debug.ms(stop * 1000), out_dir)
     report("offset")
@@ -130,17 +133,17 @@ def collect(device, start, stop, out_dir, html=False, report=lambda step: None, 
     out_dir = Path(out_dir).expanduser()
     dump_path = out_dir / "dump" / f"batterystats_{stamp}.txt"
     dump_path.parent.mkdir(parents=True, exist_ok=True)
-    notes, trace_path = list(preparation.notes) if preparation else [], None
+    notes, trace_path = list(preparation.notes), None
     if device.wireless:
         notes.append(WIFI_NOTE)
-    if preparation and preparation.clock_offset_ms is not None:
+    if preparation.clock_offset_ms is not None:
         drift = offset - preparation.clock_offset_ms
         if abs(drift) > MAX_CLOCK_DRIFT_MS:
             logger.warning("The clock offset changed by %d ms during the session", drift)
             notes.append(f"The phone's clock moved by {drift / 1000:+.1f} s relative to the computer's during the "
                          "session (a clock was set or synchronized): the start and stop of the session may be "
                          "off by up to that much.")
-    if preparation and preparation.trace:
+    if preparation.trace:
         report("trace")
         try:
             trace_path = perfetto.stop(preparation.trace, dump_path.with_name(f"perfetto_{stamp}.pftrace"))
@@ -150,19 +153,19 @@ def collect(device, start, stop, out_dir, html=False, report=lambda step: None, 
                          "from the battery statistics.")
     report("dump")
     dump_ms = to_device_ms(time.time())
-    if adb.dump_batterystats(device.serial, dump_path) and not _counter_changes(dump_path):
-        # Estimating the energy from the battery level needs the capacity, only in the full statistics.
+    # Estimating the energy from the battery level needs the capacity, only in the full statistics:
+    # read them at once without a coulomb counter, or when the counter turns out not to change.
+    if (adb.dump_batterystats(device.serial, dump_path, history_only=preparation.coulomb is not False)
+            and not _counter_changes(dump_path)):
         logger.info("The charge counter does not change: reading the full battery statistics for the capacity")
         adb.dump_batterystats(device.serial, dump_path, history_only=False)
-    if preparation and not preparation.restored:
-        adb.restore(device.serial)
-        preparation.restored = True
+    preparation.restore()
     report("parse")
     meta = {"device": {k: v for k, v in asdict(device).items() if k != "state"},
             "clock_offset_ms": offset,
-            "clock_offset_at_start_ms": preparation.clock_offset_ms if preparation else None,
+            "clock_offset_at_start_ms": preparation.clock_offset_ms,
             "transport": "wifi" if device.wireless else "usb"}
-    if preparation and preparation.perfetto_unavailable:
+    if preparation.perfetto_unavailable:
         meta["perfetto_unavailable"] = preparation.perfetto_unavailable
     markers = [{"time_ms": to_device_ms(m["time"]), "label": m["label"]} for m in markers]
     return process(dump_path, to_device_ms(start), to_device_ms(stop), out_dir / f"PowDroid_{stamp}.csv",
@@ -479,10 +482,8 @@ def rename_marker(result, index, label):
     """Rename a marker of a processed session: its phases, session JSON and HTML report (if any) follow."""
     result.markers[index]["label"] = label
     result.phases = metrics.phase_summaries(result.rows, result.markers)
-    saved = json.loads(result.json_path.read_text(encoding="utf-8"))
-    saved["markers"], saved["phases"] = result.markers, result.phases
-    result.json_path.write_text(json.dumps(saved, indent=2), encoding="utf-8")
-    result.details = saved
+    result.details.update(markers=result.markers, phases=result.phases)  # the session JSON, as written or loaded
+    result.json_path.write_text(json.dumps(result.details, indent=2), encoding="utf-8")
     if result.csv_path.with_suffix(".html").exists():
         result.html_path = html_report.write(result)
 

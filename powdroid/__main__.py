@@ -66,7 +66,7 @@ def main():
     if invalid or not formats:
         parser.error(f"invalid output format: {', '.join(invalid) or args.output!r} (use csv, html or csv,html)")
 
-    from powdroid.cli.cli import main as cli_main
+    from powdroid.cli import cli
     from powdroid.core import adb, debug
 
     if args.adb:
@@ -82,14 +82,10 @@ def main():
             parser.error(f"cannot write the debug log: {e}")
     try:
         if args.reprocess:
-            from powdroid.cli.cli import reprocess
-
-            return reprocess(args.reprocess, formats, args.dir, args.traceback)
+            return cli.reprocess(args.reprocess, formats, args.dir, args.traceback)
         if args.collect_pending:
-            from powdroid.cli.cli import collect_pending
-
-            return collect_pending(args.serial, args.verbose, args.traceback)
-        return cli_main(formats, out_dir, args.serial, args.verbose, args.traceback, args.perfetto, args.duration,
+            return cli.collect_pending(args.serial, args.verbose, args.traceback)
+        return cli.main(formats, out_dir, args.serial, args.verbose, args.traceback, args.perfetto, args.duration,
                         args.connect)
     except KeyboardInterrupt:
         print("\n[PowDroid] Interrupted.")
